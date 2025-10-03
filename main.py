@@ -1860,56 +1860,16 @@ def responsibility_report():
     )
 
 
-from openai import OpenAI
 
-# ---------------- OpenAI ----------------
 
 
 # ---------------- Routes ----------------
-from flask import render_template, flash
-from openai import OpenAI, OpenAIError
-from openai import OpenAI
-
-OPENAI_API_KEY = "sk-XXXXXXXXXXXXXXXXXXXXXXXX"  # المفتاح هنا مباشرة
-client = OpenAI(api_key=OPENAI_API_KEY)
-
-import os
-from openai import OpenAI
-import os
-print(os.getenv("OPENAI_API_KEY"))
-import os
-print(os.getenv("OPENAI_API_KEY"))
-
-from flask import request, jsonify
-from datetime import datetime
-from models import ActionPlan  # استبدل بالمسار الصحيح لنموذجك
 
 from flask import Flask, render_template, request, jsonify
 from datetime import datetime
 from models import db, ActionPlan  # استبدل بالمسار الصحيح لنموذجك
 
-from sqlalchemy.orm import joinedload
-from sqlalchemy.orm import joinedload
-
-from sqlalchemy.orm import joinedload
-
-from sqlalchemy.orm import joinedload, contains_eager
-from sqlalchemy.orm import joinedload
 from sqlalchemy import func
-
-from collections import Counter
-from collections import Counter
-from flask import render_template
-from sqlalchemy.orm import joinedload
-
-from collections import Counter
-from flask import render_template
-from sqlalchemy.orm import joinedload
-
-
-from collections import Counter
-from flask import render_template
-from sqlalchemy.orm import joinedload
 
 from collections import Counter
 from flask import render_template
