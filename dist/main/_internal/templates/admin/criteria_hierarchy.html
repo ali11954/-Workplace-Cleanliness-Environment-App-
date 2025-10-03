@@ -1,0 +1,58 @@
+{% extends 'admin/dashboard.html' %}
+{% block content %}
+<div class="container mt-4">
+    <h4>التسلسل الهرمي للمعايير</h4>
+    <ul class="list-group">
+        {% for region in regions %}
+        <li class="list-group-item">
+            <strong>{{ region.name }}</strong>
+            {% set region_sites = region.sites %}
+            {% if region_sites %}
+            <ul class="list-group mt-2 ms-3">
+                {% for site in region_sites %}
+                <li class="list-group-item">
+                    {{ site.name }}
+                    {% set site_places = site.places %}
+                    {% if site_places %}
+                    <ul class="list-group mt-2 ms-3">
+                        {% for place in site_places %}
+                        <li class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span>🏠 {{ place.name }}</span>
+                                <a href="{{ url_for('add_criterion', place_id=place.id) }}" class="btn btn-sm btn-outline-primary">إضافة معيار</a>
+                            </div>
+                            {% set criteria = place.criteria %}
+                            {% if criteria %}
+                            <ul class="list-group mt-2 ms-3">
+                                {% for crit in criteria %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    {{ crit.name }} ({{ crit.min_score }} - {{ crit.max_score }})
+                                    <div>
+                                        <a href="{{ url_for('edit_criterion', criterion_id=crit.id) }}" class="btn btn-sm btn-warning">تعديل</a>
+                                        <form action="{{ url_for('delete_criterion', criterion_id=crit.id) }}" method="post" style="display:inline-block;">
+                                            <button class="btn btn-sm btn-danger" onclick="return confirm('هل أنت متأكد؟')">حذف</button>
+                                        </form>
+                                    </div>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                            {% else %}
+                            <small class="text-muted ms-3">لا توجد معايير</small>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <div class="text-muted ms-3">لا توجد أماكن</div>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div class="text-muted ms-3">لا توجد مواقع فرعية</div>
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endblock %}

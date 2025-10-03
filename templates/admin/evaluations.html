@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}تسجيل التقييم{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4 text-center">تسجيل التقييم</h2>
+
+    <form method="POST">
+        {{ form.hidden_tag() }}
+
+        <div class="row mb-3">
+            <div class="col">
+                {{ form.region_id.label }}
+                {{ form.region_id(class="form-select") }}
+            </div>
+            <div class="col">
+                {{ form.site_id.label }}
+                {{ form.site_id(class="form-select") }}
+            </div>
+            <div class="col">
+                {{ form.place_id.label }}
+                {{ form.place_id(class="form-select") }}
+            </div>
+        </div>
+
+        <hr>
+        <h4>المعايير والتقييمات</h4>
+        <table class="table table-bordered text-center" id="criteria-table">
+            <thead>
+                <tr>
+                    <th>المعيار</th>
+                    <th>جهة المسؤولية</th>
+                    <th>الدرجة</th>
+                    <th><button type="button" class="btn btn-sm btn-primary" id="add-row">إضافة معيار</button></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for detail in form.details %}
+                <tr>
+                    <td>{{ detail.criterion_id(class="form-select") }}</td>
+                    <td>{{ detail.authority_id(class="form-select") }}</td>
+                    <td>{{ detail.score(class="form-control") }}</td>
+                    <td></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="mb-3">
+            {{ form.notes.label }}
+            {{ form.notes(class="form-control") }}
+        </div>
+
+        <button class="btn btn-success">{{ form.submit.label }}</button>
+    </form>
+
+    <hr>
+    <h3 class="mt-4">قائمة التقييمات المسجلة</h3>
+    <table class="table table-bordered text-center">
+        <thead>
+            <tr>
+                <th>المنطقة</th>
+                <th>الموقع</th>
+                <th>المكان</th>
+                <th>المعيار</th>
+                <th>الجهة</th>
+                <th>الدرجة</th>
+                <th>الملاحظات</th>
+                <th>التاريخ</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ev in evaluations %}
+            <tr>
+                <td>{{ ev.region.name }}</td>
+                <td>{{ ev.site.name }}</td>
+                <td>{{ ev.place.name }}</td>
+                <td>
+                    {% for detail in ev.details %}
+                        {{ detail.criterion.name }}<br>
+                    {% endfor %}
+                </td>
+                <td>
+                    {% for detail in ev.details %}
+                        {{ detail.authority.name }}<br>
+                    {% endfor %}
+                </td>
+                <td>
+                    {% for detail in ev.details %}
+                        {{ detail.score }}<br>
+                    {% endfor %}
+                </td>
+                <td>{{ ev.notes }}</td>
+                <td>{{ ev.date.strftime("%Y-%m-%d") }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="8">لا توجد تقييمات مسجلة بعد</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+document.getElementById('add-row').addEventListener('click', function() {
+    let tableBody = document.querySelector('#criteria-table tbody');
+    let newRow = tableBody.rows[0].cloneNode(true); // نسخ أول صف كقالب
+    newRow.querySelectorAll('select,input').forEach(input => input.value = ''); // تفريغ القيم
+    tableBody.appendChild(newRow);
+});
+</script>
+
+{% endblock %}

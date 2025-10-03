@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+{% block title %}{% if form.fullname.data %}تعديل مستخدم{% else %}إضافة مستخدم{% endif %}{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">{% if form.fullname.data %}تعديل مستخدم{% else %}إضافة مستخدم{% endif %}</h2>
+
+<form method="POST" novalidate class="p-4 border rounded shadow-sm bg-light">
+    {{ form.hidden_tag() }}
+
+    <!-- الاسم الكامل -->
+    <div class="mb-3">
+        {{ form.fullname.label(class="form-label fw-bold") }}
+        {{ form.fullname(class="form-control", placeholder="الاسم الكامل") }}
+        {% for error in form.fullname.errors %}
+            <div class="text-danger small">{{ error }}</div>
+        {% endfor %}
+    </div>
+
+    <!-- اسم المستخدم -->
+    <div class="mb-3">
+        {{ form.username.label(class="form-label fw-bold") }}
+        {{ form.username(class="form-control", placeholder="اسم المستخدم") }}
+        {% for error in form.username.errors %}
+            <div class="text-danger small">{{ error }}</div>
+        {% endfor %}
+    </div>
+<!-- البريد الإلكتروني -->
+<div class="mb-3">
+    {{ form.email.label(class="form-label fw-bold") }}
+    {{ form.email(class="form-control", placeholder="البريد الإلكتروني") }}
+    {% for error in form.email.errors %}
+        <div class="text-danger small">{{ error }}</div>
+    {% endfor %}
+</div>
+
+    <!-- كلمة المرور -->
+    <div class="mb-3">
+        {{ form.password.label(class="form-label fw-bold") }}
+        {{ form.password(class="form-control", placeholder="كلمة المرور") }}
+        {% for error in form.password.errors %}
+            <div class="text-danger small">{{ error }}</div>
+        {% endfor %}
+    </div>
+
+    <!-- تأكيد كلمة المرور -->
+    <div class="mb-3">
+        {{ form.password_confirm.label(class="form-label fw-bold") }}
+        {{ form.password_confirm(class="form-control", placeholder="تأكيد كلمة المرور") }}
+        {% for error in form.password_confirm.errors %}
+            <div class="text-danger small">{{ error }}</div>
+        {% endfor %}
+    </div>
+
+    <!-- اختيار المنطقة -->
+    <div class="mb-3">
+        <label for="region_id" class="form-label fw-bold">اختر المنطقة</label>
+       <select id="region_ids" name="region_ids" class="form-select shadow-sm" multiple required>
+    {% for region in regions %}
+        <option value="{{ region.id }}"
+            {% if region.id in form.region_ids.data %}selected{% endif %}
+        >{{ region.name }}</option>
+    {% endfor %}
+</select>
+<small class="text-muted">يمكنك اختيار أكثر من منطقة بالضغط على Ctrl (أو Cmd) أثناء التحديد</small>
+
+    </div>
+
+    <!-- اختيار المستخدم بناءً على المنطقة -->
+    <div class="mb-3">
+        <label for="user_id" class="form-label fw-bold">اختر المستخدم</label>
+        <select id="user_id" name="user_id" class="form-select shadow-sm" required>
+            <option value="">-- اختر المستخدم --</option>
+            {% for u in users %}
+                <option value="{{ u.id }}" data-region="{{ u.region_id }}"
+                 {% if selected_user_id == u.id %}selected{% endif %}
+
+                    {{ u.fullname }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <!-- الصلاحية -->
+    <div class="mb-3">
+        {{ form.role.label(class="form-label fw-bold") }}
+        {{ form.role(class="form-select shadow-sm") }}
+    </div>
+
+    <!-- حالة المستخدم -->
+    <div class="mb-3">
+        {{ form.active.label(class="form-label fw-bold") }}
+        {{ form.active(class="form-select shadow-sm") }}
+    </div>
+
+    <!-- أزرار الحفظ والإلغاء -->
+    <div class="mb-3">
+        <button type="submit" class="btn btn-primary shadow-sm">{{ form.submit.label.text }}</button>
+        <a href="{{ url_for('users') }}" class="btn btn-secondary shadow-sm">إلغاء</a>
+    </div>
+</form>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function filterUsers() {
+    const regionSelect = document.getElementById('region_id');
+    const userSelect = document.getElementById('user_id');
+    const selectedRegion = regionSelect.value;
+
+    for (let option of userSelect.options) {
+        if (!option.value) continue;
+        // إظهار الخيارات المتوافقة فقط
+        option.style.display = (option.dataset.region == selectedRegion) ? 'block' : 'none';
+    }
+
+    // إذا كان هناك مستخدم محدد مسبقًا، احتفظ به
+   const selectedUser = "{{ selected_user_id or '' }}";
+
+    if (selectedUser) {
+        userSelect.value = selectedUser;
+    } else {
+        userSelect.value = "";
+    }
+}
+
+// تنفيذ الفلترة عند تحميل الصفحة
+window.addEventListener('DOMContentLoaded', filterUsers);
+</script>
+{% endblock %}

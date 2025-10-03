@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <h3 class="text-center mb-4 text-primary fw-bold">✨ إضافة تقييم جديد ✨</h3>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, msg in messages %}
+                <div class="alert alert-{{ category }} shadow-sm rounded-3">{{ msg }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <form method="POST" id="evaluation-form" action="{{ url_for('evaluations') }}">
+        <!-- اختيار المنطقة -->
+        <div class="card shadow-sm mb-3 border-0">
+            <div class="card-body bg-light rounded-3">
+                <label for="region" class="form-label fw-bold text-secondary">🌍 المنطقة</label>
+                <select name="region_id" id="region" class="form-select border-primary shadow-sm" required>
+                    <option value="">-- اختر المنطقة --</option>
+                    {% for r in regions %}
+                        <option value="{{ r.id }}">{{ r.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <!-- اختيار الموقع -->
+        <div class="card shadow-sm mb-3 border-0">
+            <div class="card-body bg-light rounded-3">
+                <label for="site" class="form-label fw-bold text-secondary">📌 الموقع</label>
+                <select name="site_id" id="site" class="form-select border-success shadow-sm" required disabled>
+                    <option value="">-- اختر الموقع --</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- قوالب المعايير -->
+        <div id="criteria-container" style="display:none;">
+            <h5 class="fw-bold text-info mb-3">📑 المعايير</h5>
+            <div id="criteria-cards"></div>
+        </div>
+
+        <!-- ملاحظات عامة -->
+        <div class="card shadow-sm mb-3 border-0">
+            <div class="card-body bg-light rounded-3">
+                <label for="notes" class="form-label fw-bold text-secondary">📝 ملاحظات عامة</label>
+                <textarea name="notes" id="notes" class="form-control border-warning shadow-sm" rows="3"></textarea>
+            </div>
+        </div>
+
+        <div class="text-center">
+            <button type="submit" class="btn btn-lg btn-primary shadow px-5 rounded-pill">
+                💾 حفظ التقييم
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const regionSelect = document.getElementById('region');
+    const siteSelect = document.getElementById('site');
+    const criteriaContainer = document.getElementById('criteria-container');
+    const criteriaCards = document.getElementById('criteria-cards');
+
+    // تحميل المواقع عند اختيار المنطقة
+    regionSelect.addEventListener('change', () => {
+        const regionId = regionSelect.value;
+        siteSelect.innerHTML = '<option value="">-- اختر الموقع --</option>';
+        criteriaContainer.style.display = 'none';
+        criteriaCards.innerHTML = '';
+        if (regionId) {
+            siteSelect.disabled = false;
+            fetch(`/get_sites/${regionId}`)
+                .then(res => res.json())
+                .then(data => {
+                    data.forEach(site => {
+                        const option = document.createElement('option');
+                        option.value = site.id;
+                        option.textContent = site.name;
+                        siteSelect.appendChild(option);
+                    });
+                });
+        } else {
+            siteSelect.disabled = true;
+        }
+    });
+
+    // تحميل جميع الأماكن ومعاييرها عند اختيار الموقع
+    siteSelect.addEventListener('change', () => {
+        const siteId = siteSelect.value;
+        criteriaCards.innerHTML = '';
+        criteriaContainer.style.display = 'none';
+
+        if (siteId) {
+            fetch(`/get_site_criteria/${siteId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.length > 0) {
+                        criteriaContainer.style.display = 'block';
+
+                        data.forEach(item => {
+                            // بطاقة المكان
+                            const card = document.createElement('div');
+                            card.className = "card shadow-sm mb-4 border-info";
+
+                            const cardHeader = document.createElement('div');
+                            cardHeader.className = "card-header bg-info text-white fw-bold";
+                            cardHeader.innerHTML = `📍 ${item.place_name}`;
+                            card.appendChild(cardHeader);
+
+                            const cardBody = document.createElement('div');
+                            cardBody.className = "card-body";
+
+                            // المعايير داخل جدول منسق
+                            const table = document.createElement('table');
+                            table.className = "table table-bordered align-middle";
+                            table.innerHTML = `
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>اسم المعيار</th>
+                                        <th>جهة المسؤولية</th>
+                                        <th>الحد الأدنى</th>
+                                        <th>الحد الأعلى</th>
+                                        <th>التقييم (الدرجة)</th>
+                                        <th>📝 ملاحظة</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            `;
+
+                            const tbody = table.querySelector('tbody');
+                            item.criteria.forEach(criterion => {
+                                const tr = document.createElement('tr');
+
+                                const tdName = document.createElement('td');
+                                tdName.textContent = criterion.name;
+
+                                const tdAuthority = document.createElement('td');
+                                tdAuthority.textContent = criterion.authority_name || '-';
+
+                                const tdMin = document.createElement('td');
+                                tdMin.textContent = criterion.min_score ?? '-';
+
+                                const tdMax = document.createElement('td');
+                                tdMax.textContent = criterion.max_score ?? '-';
+
+                                const tdScore = document.createElement('td');
+                                const inputScore = document.createElement('input');
+                                inputScore.type = 'number';
+                                inputScore.name = 'score[]';
+                                inputScore.min = criterion.min_score || 0;
+                                inputScore.max = criterion.max_score || 10;
+                                inputScore.required = true;
+                                inputScore.classList.add('form-control', 'border-primary', 'shadow-sm');
+
+                                const inputId = document.createElement('input');
+                                inputId.type = 'hidden';
+                                inputId.name = 'criteria_ids[]';
+                                inputId.value = criterion.id;
+
+                                const inputAuthority = document.createElement('input');
+                                inputAuthority.type = 'hidden';
+                                inputAuthority.name = 'authority_ids[]';
+                                inputAuthority.value = criterion.authority_id || '';
+
+                                const inputPlace = document.createElement('input');
+                                inputPlace.type = 'hidden';
+                                inputPlace.name = 'place_ids[]';
+                                inputPlace.value = item.place_id;
+
+                                tdScore.appendChild(inputScore);
+                                tdScore.appendChild(inputId);
+                                tdScore.appendChild(inputAuthority);
+                                tdScore.appendChild(inputPlace);
+
+                                const tdNote = document.createElement('td');
+                                const inputNote = document.createElement('input');
+                                inputNote.type = 'text';
+                                inputNote.name = 'criterion_notes[]';
+                                inputNote.placeholder = 'إضافة ملاحظة (اختياري)';
+                                inputNote.classList.add('form-control', 'border-warning', 'shadow-sm');
+                                tdNote.appendChild(inputNote);
+
+                                tr.appendChild(tdName);
+                                tr.appendChild(tdAuthority);
+                                tr.appendChild(tdMin);
+                                tr.appendChild(tdMax);
+                                tr.appendChild(tdScore);
+                                tr.appendChild(tdNote);
+
+                                tbody.appendChild(tr);
+                            });
+
+                            cardBody.appendChild(table);
+                            card.appendChild(cardBody);
+                            criteriaCards.appendChild(card);
+                        });
+                    }
+                });
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block title %}عرض الهيكل الجغرافي{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">الهيكل الجغرافي للمواقع</h2>
+
+<div class="accordion" id="regionsAccordion">
+  {% for region_data in tree %}
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="heading{{ region_data.region.id }}">
+        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ region_data.region.id }}" aria-expanded="false">
+          🗺️ {{ region_data.region.name }}
+        </button>
+      </h2>
+      <div id="collapse{{ region_data.region.id }}" class="accordion-collapse collapse" data-bs-parent="#regionsAccordion">
+        <div class="accordion-body">
+
+          <ul class="list-group">
+            {% for site_data in region_data.sites %}
+              <li class="list-group-item">
+                <strong>📍 {{ site_data.site.name }}</strong>
+                {% if site_data.places %}
+                  <ul class="list-group mt-2 ms-3">
+                    {% for place in site_data.places %}
+                      <li class="list-group-item">🏠 {{ place.name }}</li>
+                    {% endfor %}
+                  </ul>
+                {% else %}
+                  <p class="text-muted mt-2">لا توجد أماكن مسجلة.</p>
+                {% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+
+        </div>
+      </div>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

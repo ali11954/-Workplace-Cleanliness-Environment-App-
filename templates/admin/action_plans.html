@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block title %}خطط العمل للملاحظات{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4 text-center text-primary fw-bold">خطط العمل للملاحظات</h2>
+
+    {% if action_plans %}
+
+    <!-- إحصائية أكثر 5 معايير تكرارًا -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="card-title text-success fw-bold">📊 أكثر 5 معايير تكرارًا</h5>
+            <ul class="list-group list-group-flush">
+                {% for criterion in top_criteria %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    {{ criterion.name }}
+                    <span class="badge bg-success rounded-pill">{{ criterion.count }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            <canvas id="criteriaChart" class="mt-3"></canvas>
+        </div>
+    </div>
+
+    <!-- فلترة وبحث -->
+    <div class="row mb-3">
+        <div class="col-md-4 mb-2">
+            <input type="text" id="searchInput" class="form-control" placeholder="بحث سريع...">
+        </div>
+        <div class="col-md-3 mb-2">
+            <select id="filterStatus" class="form-select">
+                <option value="">كل الحالات</option>
+                <option value="مفتوحة">مفتوحة</option>
+                <option value="مغلقة">مغلقة</option>
+            </select>
+        </div>
+        <div class="col-md-5 text-end mb-2">
+            <button class="btn btn-outline-success" onclick="exportTableToExcel('actionPlanTable', 'ActionPlans')">تصدير Excel</button>
+            <button class="btn btn-outline-primary" onclick="window.print()">طباعة PDF</button>
+        </div>
+    </div>
+
+    <!-- جدول الملاحظات -->
+    <div class="table-responsive">
+        <table class="table table-bordered table-striped" id="actionPlanTable">
+            <thead class="table-success">
+                <tr>
+                    <th>م</th>
+                    <th>الملاحظة</th>
+                    <th>خطوة العمل المقترحة</th>
+                    <th>المنطقة</th>
+                    <th>الموقع</th>
+                    <th>المكان</th>
+                    <th>المعيار</th>
+                    <th>عدد التكرار</th>
+                    <th>درجة المعيار</th>
+                    <th>تاريخ التقييم</th>
+                    <th>الحالة</th>
+                    <th>تاريخ الإغلاق</th>
+                    <th>عدد الأيام</th>
+                    <th>ملاحظات الإغلاق</th>
+                    <th>تحسن التقييم</th>
+                    <th>إغلاق</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for plan in action_plans %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td class="text-start">{{ plan.note or '-' }}</td>
+                    <td class="text-start">{{ plan.action_plans[0].action_plan if plan.action_plans else '-' }}</td>
+                    <td>{{ plan.evaluation.region.name if plan.evaluation and plan.evaluation.region else '-' }}</td>
+                    <td>{{ plan.evaluation.site.name if plan.evaluation and plan.evaluation.site else '-' }}</td>
+                    <td>{{ plan.place.name if plan.place else '-' }}</td>
+                    <td>{{ plan.criterion.name if plan.criterion else '-' }}</td>
+                    <td>
+                        {% if plan.criterion %}
+                            {{ criterion_counts.get((
+                                plan.criterion.name,
+                                plan.place.name if plan.place else '-',
+                                plan.evaluation.site.name if plan.evaluation and plan.evaluation.site else '-',
+                                plan.evaluation.region.name if plan.evaluation and plan.evaluation.region else '-'
+                            ), 0) }}
+                        {% else %}
+                            0
+                        {% endif %}
+                    </td>
+                    <td>{{ plan.score if plan.score is not none else '-' }}</td>
+                    <td>{{ plan.timestamp.strftime('%Y-%m-%d') if plan.timestamp else '-' }}</td>
+                    <td class="{{ 'text-success fw-bold' if plan.action_plans and plan.action_plans[0].closed else 'text-danger fw-bold' }}">
+                        {{ 'مغلقة' if plan.action_plans and plan.action_plans[0].closed else 'مفتوحة' }}
+                    </td>
+                    <td>{{ plan.action_plans[0].closed_date.strftime('%Y-%m-%d') if plan.action_plans and plan.action_plans[0].closed_date else '-' }}</td>
+                    <td>
+                        {% if plan.action_plans and plan.action_plans[0].closed_date and plan.timestamp %}
+                            {{ (plan.action_plans[0].closed_date.date() - plan.timestamp.date()).days }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>{{ plan.action_plans[0].closing_note if plan.action_plans else '-' }}</td>
+                    <td>{{ plan.action_plans[0].improvement_score if plan.action_plans and plan.action_plans[0].improvement_score is not none else '-' }}</td>
+                    <td>
+                        {% if not plan.action_plans or not plan.action_plans[0].closed %}
+                            <form action="{{ url_for('close_note', note_id=plan.id) }}" method="POST" class="d-flex flex-column">
+                                <input type="date" name="closed_date" class="form-control mb-1" required>
+                                <input type="text" name="closing_note" placeholder="أضف ملاحظات الإغلاق" class="form-control mb-1">
+                                <input type="number" name="improvement_score" placeholder="تحسن %" class="form-control mb-1" min="0" max="100" required>
+                                <button type="submit" class="btn btn-success btn-sm">إغلاق</button>
+                            </form>
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% else %}
+    <p class="text-center text-muted">لا توجد ملاحظات لعرضها.</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+.table-responsive { overflow-x: auto; }
+#actionPlanTable {
+    width: 100%;
+    min-width: 1200px;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.9rem;
+}
+#actionPlanTable th, #actionPlanTable td { vertical-align: middle; text-align: center; padding: 8px 10px; }
+#actionPlanTable thead th {
+    background: linear-gradient(135deg, #198754, #20c997);
+    color: #fff; font-weight: bold;
+    position: sticky; top: 0; z-index: 2;
+}
+#actionPlanTable tbody tr { transition: background 0.3s, transform 0.2s; }
+#actionPlanTable tbody tr:nth-child(even) { background-color: rgba(0,0,0,0.03); }
+#actionPlanTable tbody tr:hover { background-color: rgba(25, 135, 84, 0.08); transform: scale(1.01); }
+#actionPlanTable td { border-bottom: 1px solid rgba(0,0,0,0.05); }
+
+form input, form button { font-size: 0.8rem; }
+form input { height: 30px; }
+form button { height: 30px; padding: 2px 8px; }
+
+#searchInput, #filterStatus { border-radius: 0.3rem; padding: 5px 10px; }
+.btn-outline-success, .btn-outline-primary { border-radius: 0.3rem; font-size: 0.85rem; padding: 5px 12px; transition: transform 0.2s; }
+.btn-outline-success:hover, .btn-outline-primary:hover { transform: scale(1.05); }
+
+@media (max-width: 1200px) { #actionPlanTable { min-width: 1200px; } }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<script>
+    // فلترة حسب الحالة
+    document.getElementById('filterStatus').addEventListener('change', function() {
+        let status = this.value;
+        let rows = document.querySelectorAll('#actionPlanTable tbody tr');
+        rows.forEach(row => {
+            let cell = row.cells[10];
+            row.style.display = (status === "" || (cell && cell.innerText === status)) ? '' : 'none';
+        });
+    });
+
+    // البحث السريع
+    document.getElementById('searchInput').addEventListener('keyup', function() {
+        let filter = this.value.toLowerCase();
+        let rows = document.querySelectorAll('#actionPlanTable tbody tr');
+        rows.forEach(row => {
+            row.style.display = Array.from(row.cells).some(td => td.innerText.toLowerCase().includes(filter)) ? '' : 'none';
+        });
+    });
+
+    // تصدير Excel
+    function exportTableToExcel(tableID, filename = '') {
+        let table = document.getElementById(tableID);
+        let wb = XLSX.utils.table_to_book(table, {sheet:"Sheet 1"});
+        XLSX.writeFile(wb, filename ? filename + ".xlsx" : "ActionPlans.xlsx");
+    }
+
+    // رسم بياني للمعايير الأكثر تكرارًا
+    const labels = {{ top_criteria | map(attribute='name') | list | tojson }};
+    const counts = {{ top_criteria | map(attribute='count') | list | tojson }};
+    const infos  = {{ top_criteria | map(attribute='info') | default([]) | list | tojson }};
+
+    new Chart(document.getElementById('criteriaChart'), {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'عدد التكرارات',
+                data: counts,
+                backgroundColor: ['#20c997','#0d6efd','#ffc107','#dc3545','#198754'],
+                borderRadius: 5
+            }]
+        },
+        options: {
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `التكرار: ${context.parsed.y} | ${infos[context.dataIndex] || '-'}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: { beginAtZero: true, title: { display: true, text: 'عدد التكرارات' } },
+                x: { title: { display: true, text: 'المعايير' } }
+            }
+        }
+    });
+</script>
+{% endblock %}

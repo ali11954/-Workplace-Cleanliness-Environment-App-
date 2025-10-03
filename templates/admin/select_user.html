@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}نماذج التقييم{% endblock %}
+
+{% block content %}
+
+<h2>اختر المستخدم لطباعة النموذج</h2>
+
+<!-- بطاقات المستخدمين -->
+<div class="user-card-wrapper">
+   {% for user in users %}
+   <div class="user-card">
+       <div class="user-name">{{ user.fullname }}</div>
+       <div class="user-region">{{ user.region.name if user.region else '-' }}</div>
+       <a href="{{ url_for('generate_user_pdf', user_id=user.id) }}" class="print-btn">
+           <i class="fas fa-print"></i>
+           <span>طباعة نموذج التقييم</span>
+       </a>
+   </div>
+   {% endfor %}
+</div>
+
+<hr>
+
+<!-- اختيار المستخدم من القائمة -->
+<form method="POST" class="mb-4">
+    <label for="user_id">اختر المستخدم:</label>
+    <select name="user_id" id="user_id" required class="form-select">
+        <option value="">-- اختر المستخدم --</option>
+        {% for user in users %}
+        <option value="{{ user.id }}" {% if selected_user and selected_user.id == user.id %}selected{% endif %}>{{ user.fullname }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-success mt-2">عرض النموذج</button>
+</form>
+
+<!-- عرض نموذج المعايير فقط بعد اختيار المستخدم -->
+{% if selected_user %}
+<hr>
+<h2>نموذج المعايير: {{ selected_user.fullname }}</h2>
+
+{% if evaluation_details %}
+<table class="table table-bordered table-striped">
+    <thead class="table-success">
+        <tr>
+            <th>الموقع</th>
+            <th>المكان</th>
+            <th>المعيار</th>
+            <th>الدرجة الأدنى</th>
+            <th>الدرجة العليا</th>
+            <th>جهة المسؤولية</th>
+            <th>تقييم يومي</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for detail in evaluation_details %}
+        <tr>
+            <td>{{ detail.site_name }}</td>
+            <td>{{ detail.place_name }}</td>
+            <td>{{ detail.criterion_name }}</td>
+            <td>{{ detail.min_score }}</td>
+            <td>{{ detail.max_score }}</td>
+            <td>{{ detail.authority_name }}</td>
+            <td></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p style="text-align:center; color:red; font-weight:bold;">لا توجد بيانات لهذا المستخدم.</p>
+{% endif %}
+{% endif %}
+
+{% endblock %}
+
+{% block styles %}
+<style>
+/* بطاقات المستخدمين */
+.user-card-wrapper { display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; margin-bottom: 20px; }
+.user-card { border: 1px solid #ccc; padding: 10px; width: 200px; text-align: center; border-radius: 5px; }
+.user-card .user-name { font-weight: bold; margin-bottom: 5px; }
+.user-card .user-region { font-size: 0.9em; color: #555; margin-bottom: 10px; }
+.user-card a.print-btn { display: block; padding: 5px 10px; background-color: #198754; color: #fff; border-radius: 3px; text-decoration: none; }
+.user-card a.print-btn:hover { background-color: #145c2a; color: #fff; }
+.place-cell { text-align: right; font-weight: bold; }
+</style>
+{% endblock %}

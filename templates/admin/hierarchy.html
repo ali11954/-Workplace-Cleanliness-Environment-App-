@@ -1,0 +1,33 @@
+{% extends "admin/dashboard.html" %}
+{% block content %}
+<div class="container mt-4">
+    <h3 class="mb-4">التسلسل الهرمي: المواقع → المواقع الفرعية → الأماكن</h3>
+    <ul class="list-group">
+        {% for location in locations %}
+            <li class="list-group-item">
+                <strong>{{ location.name }}</strong>
+                {% if location.sites %}
+                    <ul class="list-group mt-2 ms-4">
+                        {% for site in location.sites %}
+                            <li class="list-group-item">
+                                {{ site.name }}
+                                {% if site.places %}
+                                    <ul class="list-group mt-2 ms-4">
+                                        {% for place in site.places %}
+                                            <li class="list-group-item">{{ place.name }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                {% else %}
+                                    <div class="text-muted ms-3">لا توجد أماكن</div>
+                                {% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <div class="text-muted ms-3">لا توجد مواقع فرعية</div>
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endblock %}

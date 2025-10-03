@@ -1,0 +1,160 @@
+<form method="POST" class="modern-form" dir="rtl" novalidate>
+
+  <h2 class="form-title">إضافة / تعديل معيار</h2>
+
+  <div class="input-group">
+    <input
+      type="text"
+      id="name"
+      name="name"
+      required
+      value="{{ criterion.name if criterion else '' }}"
+      autocomplete="off"
+    />
+    <label for="name">اسم المعيار</label>
+    <small class="error-message">الرجاء إدخال اسم المعيار</small>
+  </div>
+
+  <div class="input-group">
+    <input
+      type="number"
+      id="min_score"
+      name="min_score"
+      required
+      step="0.01"
+      min="0"
+      value="{{ criterion.min_score if criterion else '' }}"
+      autocomplete="off"
+    />
+    <label for="min_score">الحد الأدنى</label>
+    <small class="error-message">الرجاء إدخال الحد الأدنى</small>
+  </div>
+
+  <div class="input-group">
+    <input
+      type="number"
+      id="max_score"
+      name="max_score"
+      required
+      step="0.01"
+      min="0"
+      value="{{ criterion.max_score if criterion else '' }}"
+      autocomplete="off"
+    />
+    <label for="max_score">الحد الأعلى</label>
+    <small class="error-message">الرجاء إدخال الحد الأعلى</small>
+  </div>
+
+  <button type="submit" class="btn-submit">
+    حفظ المعيار
+    <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+      <polyline points="17 21 17 13 7 13 7 21"/>
+      <polyline points="7 3 7 8 15 8"/>
+    </svg>
+  </button>
+
+</form>
+
+<style>
+  /* تنسيق النموذج */
+  .modern-form {
+    max-width: 420px;
+    margin: 3rem auto;
+    padding: 2.5rem 2rem;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow:
+      0 6px 12px rgba(0, 0, 0, 0.1),
+      0 1px 3px rgba(0, 0, 0, 0.06);
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  }
+
+  .form-title {
+    font-weight: 700;
+    font-size: 1.8rem;
+    margin-bottom: 1.8rem;
+    color: #2c3e50;
+    text-align: center;
+  }
+
+  .input-group {
+    position: relative;
+    margin-bottom: 1.6rem;
+  }
+
+  .input-group input {
+    width: 100%;
+    padding: 14px 16px 14px 16px;
+    font-size: 1.1rem;
+    border-radius: 10px;
+    border: 2px solid #ddd;
+    outline: none;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  }
+  .input-group input:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 8px #007bff44;
+  }
+  .input-group input:invalid:not(:focus) {
+    border-color: #e74c3c;
+  }
+
+  .input-group label {
+    position: absolute;
+    top: 50%;
+    right: 16px;
+    transform: translateY(-50%);
+    background: white;
+    padding: 0 6px;
+    color: #999;
+    font-size: 1rem;
+    pointer-events: none;
+    transition: 0.3s ease all;
+  }
+  .input-group input:focus + label,
+  .input-group input:not(:placeholder-shown) + label {
+    top: -8px;
+    font-size: 0.8rem;
+    color: #007bff;
+    right: 12px;
+  }
+
+  .error-message {
+    display: none;
+    font-size: 0.8rem;
+    color: #e74c3c;
+    margin-top: 4px;
+  }
+
+  .input-group input:invalid:not(:focus) ~ .error-message {
+    display: block;
+  }
+
+  .btn-submit {
+    width: 100%;
+    background: #007bff;
+    border: none;
+    color: white;
+    font-weight: 600;
+    font-size: 1.15rem;
+    padding: 14px 0;
+    border-radius: 12px;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 6px 10px #007bff88;
+    transition: background 0.3s ease;
+  }
+  .btn-submit:hover {
+    background: #0056b3;
+  }
+
+  .icon {
+    width: 22px;
+    height: 22px;
+    stroke: white;
+  }
+</style>

@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4" dir="rtl">
+    <h3 class="mb-4 text-success fw-bold"><i class="bi bi-bar-chart-line-fill"></i> تقرير تقييمات المستخدمين</h3>
+
+    <!-- نموذج الفلاتر -->
+    <form method="get" action="{{ url_for('reports') }}" class="row g-3 mb-4">
+        <div class="col-md-3">
+            <label for="start_date" class="form-label">من تاريخ</label>
+            <input type="date" id="start_date" name="start_date" class="form-control" value="{{ start_date }}">
+        </div>
+
+        <div class="col-md-3">
+            <label for="end_date" class="form-label">إلى تاريخ</label>
+            <input type="date" id="end_date" name="end_date" class="form-control" value="{{ end_date }}">
+        </div>
+
+        <div class="col-md-3">
+            <label for="region_id" class="form-label">المنطقة</label>
+            <select id="region_id" name="region_id" class="form-select">
+                <option value="">-- اختر المنطقة --</option>
+                {% for location in locations %}
+                    <option value="{{ location.id }}" {% if selected_region_id == location.id %}selected{% endif %}>
+                        {{ location.name }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-md-3">
+            <label for="user_id" class="form-label">المستخدم</label>
+            <select id="user_id" name="user_id" class="form-select">
+                <option value="">-- اختر المستخدم --</option>
+                {% for user in users %}
+                    <option value="{{ user.id }}" {% if selected_user_id == user.id %}selected{% endif %}>
+                        {{ user.username }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-md-12 text-end">
+            <button type="submit" class="btn btn-success shadow-sm"><i class="bi bi-search"></i> تصفية</button>
+        </div>
+    </form>
+
+    {% if summary %}
+    <!-- جدول الملخص أعلى التقرير -->
+    <div class="table-responsive mb-4">
+        <h5 class="mb-3 text-success"><i class="bi bi-list-check"></i> ملخص التقييمات</h5>
+        <table class="table table-bordered table-hover text-center align-middle" style="background-color: #f0fff0;">
+            <thead class="table-success">
+                <tr>
+                    <th><i class="bi bi-geo-alt-fill"></i> المنطقة</th>
+                    <th><i class="bi bi-person-fill"></i> المستخدم</th>
+                    <th><i class="bi bi-calculator-fill"></i> إجمالي الدرجة</th>
+                    <th><i class="bi bi-percent"></i> النسبة</th>
+                    <th><i class="bi bi-list-columns-reverse"></i> إجمالي عدد المعايير</th>
+                    <th><i class="bi bi-check2-square"></i> عدد المعايير المقيمة</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in summary %}
+                <tr>
+                    <td>{{ s.region }}</td>
+                    <td>{{ s.user }}</td>
+                    <td>{{ s.score }}</td>
+                    <td>{{ s.percent }}</td>
+                    <td>{{ s.total_criteria }}</td>
+                    <td>{{ s.evaluated_criteria }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    {% if evaluations %}
+    <!-- جدول التفاصيل -->
+    <div class="table-responsive">
+        <h5 class="mb-3 text-success"><i class="bi bi-card-list"></i> تفاصيل التقييمات اليومية</h5>
+        <table class="table table-bordered table-hover text-center align-middle" style="background-color: #f8fff8;">
+            <thead class="table-success">
+                <tr>
+                    <th><i class="bi bi-calendar-date"></i> التاريخ</th>
+                    <th><i class="bi bi-geo-alt-fill"></i> المنطقة</th>
+                    <th><i class="bi bi-person-fill"></i> المستخدم</th>
+                    <th><i class="bi bi-calculator-fill"></i> إجمالي الدرجة</th>
+                    <th><i class="bi bi-percent"></i> النسبة</th>
+                    <th><i class="bi bi-list-columns-reverse"></i> إجمالي عدد المعايير</th>
+                    <th><i class="bi bi-check2-square"></i> عدد المعايير المقيمة</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for eval in evaluations %}
+                <tr>
+                    <td>{{ eval.date }}</td>
+                    <td>{{ eval.region }}</td>
+                    <td>{{ eval.user }}</td>
+                    <td>{{ eval.score }}</td>
+                    <td>{{ eval.percent }}</td>
+                    <td>{{ eval.total_criteria }}</td>
+                    <td>{{ eval.evaluated_criteria }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+        <div class="alert alert-warning text-center"><i class="bi bi-exclamation-triangle-fill"></i> لا توجد بيانات لعرضها.</div>
+    {% endif %}
+</div>
+{% endblock %}

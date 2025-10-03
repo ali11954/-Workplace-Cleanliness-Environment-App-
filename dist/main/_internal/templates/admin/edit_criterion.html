@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}تعديل المعيار{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">تعديل المعيار</h2>
+    <form method="post">
+        <div class="mb-3">
+            <label for="place_id" class="form-label">اختر المكان</label>
+            <select id="place_id" name="place_id" class="form-select" required>
+                {% for location in locations %}
+                    <optgroup label="{{ location.name }}">
+                        {% for site in location.sites %}
+                            {% for place in site.places %}
+                                <option value="{{ place.id }}" {% if place.id == criterion.place_id %}selected{% endif %}>
+                                    {{ location.name }} / {{ site.name }} / {{ place.name }}
+                                </option>
+                            {% endfor %}
+                        {% endfor %}
+                    </optgroup>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="name" class="form-label">اسم المعيار</label>
+            <input type="text" id="name" name="name" class="form-control" value="{{ criterion.name }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="min_score" class="form-label">الحد الأدنى</label>
+            <input type="number" id="min_score" name="min_score" step="0.01" class="form-control" value="{{ criterion.min_score }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="max_score" class="form-label">الحد الأعلى</label>
+            <input type="number" id="max_score" name="max_score" step="0.01" class="form-control" value="{{ criterion.max_score }}" required>
+        </div>
+        <button type="submit" class="btn btn-primary">حفظ التعديلات</button>
+        <a href="{{ url_for('criteria') }}" class="btn btn-secondary">إلغاء</a>
+    </form>
+</div>
+{% endblock %}

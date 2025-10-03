@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <h3>إضافة تقييم جديد</h3>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, msg in messages %}
+                <div class="alert alert-{{ category }}">{{ msg }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <form method="POST" id="evaluation-form" action="{{ url_for('evaluations') }}">
+        {{ form.csrf_token }}
+
+        <!-- اختيار المنطقة -->
+        <div class="mb-3">
+            <label for="region" class="form-label">المنطقة</label>
+            <select name="region_id" id="region" class="form-select" required>
+                <option value="">-- اختر المنطقة --</option>
+                {% for id, name in form.region_id.choices %}
+                    <option value="{{ id }}">{{ name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- اختيار الموقع -->
+        <div class="mb-3">
+            <label for="site" class="form-label">الموقع</label>
+            <select name="site_id" id="site" class="form-select" required disabled>
+                <option value="">-- اختر الموقع --</option>
+            </select>
+        </div>
+
+        <!-- اختيار المكان -->
+        <div class="mb-3">
+            <label for="place" class="form-label">المكان</label>
+            <select name="place_id" id="place" class="form-select" required disabled>
+                <option value="">-- اختر المكان --</option>
+            </select>
+        </div>
+
+        <!-- جدول المعايير والدرجات -->
+        <div id="criteria-container" style="display:none;">
+            <h5>المعايير</h5>
+            <table class="table table-bordered">
+                <thead>
+                    <tr>
+                        <th>اسم المعيار</th>
+                        <th>الحد الأدنى</th>
+                        <th>الحد الأعلى</th>
+                        <th>التقييم (الدرجة)</th>
+                    </tr>
+                </thead>
+                <tbody id="criteria-table-body">
+                    <!-- سيتم تعبئة المعايير هنا جافاسكريبت -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- ملاحظات -->
+        <div class="mb-3">
+            <label for="notes" class="form-label">ملاحظات</label>
+            <textarea name="notes" id="notes" class="form-control" rows="3"></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary">حفظ التقييم</button>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const regionSelect = document.getElementById('region');
+    const siteSelect = document.getElementById('site');
+    const placeSelect = document.getElementById('place');
+    const criteriaContainer = document.getElementById('criteria-container');
+    const criteriaTableBody = document.getElementById('criteria-table-body');
+
+    // عند اختيار المنطقة
+    regionSelect.addEventListener('change', () => {
+        const regionId = regionSelect.value;
+        siteSelect.innerHTML = '<option value="">-- اختر الموقع --</option>';
+        placeSelect.innerHTML = '<option value="">-- اختر المكان --</option>';
+        placeSelect.disabled = true;
+        criteriaContainer.style.display = 'none';
+        criteriaTableBody.innerHTML = '';
+        if (regionId) {
+            siteSelect.disabled = false;
+            fetch(`/get_sites/${regionId}`)
+                .then(res => res.json())
+                .then(data => {
+                    data.forEach(site => {
+                        const option = document.createElement('option');
+                        option.value = site.id;
+                        option.textContent = site.name;
+                        siteSelect.appendChild(option);
+                    });
+                });
+        } else {
+            siteSelect.disabled = true;
+        }
+    });
+
+    // عند اختيار الموقع
+    siteSelect.addEventListener('change', () => {
+        const siteId = siteSelect.value;
+        placeSelect.innerHTML = '<option value="">-- اختر المكان --</option>';
+        criteriaContainer.style.display = 'none';
+        criteriaTableBody.innerHTML = '';
+        if (siteId) {
+            placeSelect.disabled = false;
+            fetch(`/get_places/${siteId}`)
+                .then(res => res.json())
+                .then(data => {
+                    data.forEach(place => {
+                        const option = document.createElement('option');
+                        option.value = place.id;
+                        option.textContent = place.name;
+                        placeSelect.appendChild(option);
+                    });
+                });
+        } else {
+            placeSelect.disabled = true;
+        }
+    });
+
+    // عند اختيار المكان
+    placeSelect.addEventListener('change', () => {
+        const placeId = placeSelect.value;
+        criteriaTableBody.innerHTML = '';
+        if (placeId) {
+            fetch(`/get_criteria/${placeId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.length > 0) {
+                        criteriaContainer.style.display = 'block';
+                        data.forEach(criterion => {
+                            const tr = document.createElement('tr');
+
+                            // اسم المعيار
+                            const tdName = document.createElement('td');
+                            tdName.textContent = criterion.name;
+
+                            // أعمدة الحد الأدنى والحد الأعلى (يمكن تعديل لتظهر فعليًا إذا لديك قيم في JSON)
+                            const tdMin = document.createElement('td');
+                            tdMin.textContent = criterion.min_score !== undefined ? criterion.min_score : '-';
+
+                            const tdMax = document.createElement('td');
+                            tdMax.textContent = criterion.max_score !== undefined ? criterion.max_score : '-';
+
+                            // خانة التقييم (مدخل رقم)
+                            const tdScore = document.createElement('td');
+                            const inputScore = document.createElement('input');
+                            inputScore.type = 'number';
+                            inputScore.name = 'score[]';
+                            inputScore.min = criterion.min_score || 0;
+                            inputScore.max = criterion.max_score || 10;
+                            inputScore.required = true;
+                            inputScore.classList.add('form-control');
+
+                            // خانة مخفية تحمل ID المعيار
+                            const inputId = document.createElement('input');
+                            inputId.type = 'hidden';
+                            inputId.name = 'criteria_ids[]';
+                            inputId.value = criterion.id;
+
+                            tdScore.appendChild(inputScore);
+                            tdScore.appendChild(inputId);
+
+                            tr.appendChild(tdName);
+                            tr.appendChild(tdMin);
+                            tr.appendChild(tdMax);
+                            tr.appendChild(tdScore);
+
+                            criteriaTableBody.appendChild(tr);
+                        });
+                    } else {
+                        criteriaContainer.style.display = 'none';
+                    }
+                });
+        } else {
+            criteriaContainer.style.display = 'none';
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+
+{% block title %}لوحة المستخدم{% endblock %}
+
+{% block content %}
+<div class="main-container">
+    <h2 class="text-success fw-bold text-center">تطبيق تقييم بيئة العمل والنظافة</h2>
+    <p class="text-center">يمكنك الوصول إلى جميع واجهات النظام من خلال البطاقات أدناه.</p>
+
+    <!-- ===================== البطاقات الرئيسية ===================== -->
+   {% if current_user.is_admin %}
+    {% set features = [
+        {'url':'evaluations', 'icon':'fa-clipboard-check', 'text':'التقييمات', 'bg':'bg-evaluations'},
+        {'url':'users', 'icon':'fa-user', 'text':'المستخدمون', 'bg':'bg-users'},
+        {'url':'authorities', 'icon':'fa-users', 'text':'الجهات المسؤولة', 'bg':'bg-authorities'},
+        {'url':'locations', 'icon':'fa-map-marker-alt', 'text':'المناطق', 'bg':'bg-locations'},
+        {'url':'criteria', 'icon':'fa-list-check', 'text':'معايير التقييم', 'bg':'bg-criteria'},
+        {'url':'report_summary', 'icon':'fa-broom', 'text':'تقرير تقييم المناطق', 'bg':'bg-report-evaluation'},
+        {'url':'reports', 'icon':'fa-file-alt', 'text':'تقرير تقييم المستخدمين', 'bg':'bg-report-general'},
+        {'url':'responsibility_report', 'icon':'fa-balance-scale', 'text':'تقرير الجهات المسؤولة', 'bg':'bg-report-responsibility'}
+    ] %}
+{% else %}
+    {% set features = [
+        {'url':'evaluations', 'icon':'fa-clipboard-check', 'text':'التقييمات', 'bg':'user-bg-evaluations'},
+        {'url':'report_summary', 'icon':'fa-broom', 'text':'تقرير تقييم المناطق', 'bg':'user-bg-report-evaluation'},
+        {'url':'responsibility_report', 'icon':'fa-balance-scale', 'text':'تقرير الجهات المسؤولة', 'bg':'user-bg-report-responsibility'}
+    ] %}
+{% endif %}
+
+    <div class="card-container d-flex flex-wrap justify-content-center gap-3 mt-4">
+        {% for feature in features %}
+        <a href="{{ url_for(feature.url) }}" class="feature-card {{ feature.bg }}">
+            <div class="icon-circle">
+                <i class="fas {{ feature.icon }}"></i>
+            </div>
+            <div style="font-size:0.9rem;">{{ feature.text }}</div>
+        </a>
+        {% endfor %}
+    </div>
+
+    <!-- ===================== بطاقة المستخدم الحالية ===================== -->
+    <div class="user-card-wrapper d-flex justify-content-center mt-5">
+        <div class="user-card text-center p-4 shadow-lg rounded-4">
+            <div class="user-name fw-bold mb-3 text-dark">
+                <i class="fas fa-user-circle text-success me-2"></i>
+                {{ current_user.username }}
+            </div>
+            <a href="{{ url_for('generate_user_pdf', user_id=current_user.id) }}"
+               class="print-card-btn">
+               <i class="fas fa-print"></i>
+               <span>طباعة نموذج التقييم</span>
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- أيقونة معلومات التطبيق -->
+<div class="app-info-icon" onclick="toggleAppInfo()">
+    <i class="fas fa-info-circle"></i>
+</div>
+
+<!-- نافذة معلومات التطبيق -->
+<div id="appInfoModal" class="app-info-modal">
+    <div class="app-info-content">
+        <span class="close" onclick="toggleAppInfo()">&times;</span>
+      <h3>معلومات التطبيق</h3>
+        <p><strong>اسم التطبيق:</strong> نظام تقييم بيئة العمل والنظافة</p>
+        <p><strong>الإصدار:</strong> 1.0.0</p>
+                        <p><strong>تواصل:</strong>للتواصل او الاستفسار </p>
+        <p><strong>المصمم:</strong> علي أحمد علي مبارك</p>
+                <p><strong>بريد:</strong>alimubark440@gmail.com</p>
+                        <p><strong>هاتف:</strong>00967-(711127883 / 773014017)</p>
+
+                <p><strong>معلومات إضافية:</strong> تم تطوير هذا النظام لتسهيل عملية تقييم المناطق والجهات وفق المعايير المحددة.</p>
+
+</div>
+
+</div>
+
+<!-- أيقونة تعليمات -->
+<div class="help-icon" onclick="toggleHelp()">
+    <i class="fas fa-question-circle"></i>
+</div>
+
+<!-- نافذة تعليمات التطبيق -->
+<div id="helpModal" class="help-modal">
+    <div class="help-content">
+        <span class="close" onclick="toggleHelp()">&times;</span>
+        <h3>📘 دليل استخدام التطبيق</h3>
+        <p>هذا النظام يساعدك على إدارة <strong>تقييم بيئة العمل والنظافة</strong> بشكل متكامل. فيما يلي شرح الواجهات:</p>
+
+        <ul>
+            <li><strong>🏷️ التقييمات:</strong> إضافة وتسجيل التقييمات حسب المعايير.</li>
+            <li><strong>📄 نماذج التقييم:</strong> الوصول إلى النماذج الجاهزة لتعبئة التقييمات بشكل يدوي اثناء التنقل في المواقع على الارض.</li>
+            <li><strong>🧹 تقرير المناطق:</strong> عرض تقارير التقييم لكل منطقة.</li>
+            <li><strong>📝 خطة عمل:</strong> إضافة الملاحظات وخطط التحسين، مع متابعة حالتها (مفتوحة/مغلقة).</li>
+            <li><strong>⚖️ تقرير الجهات:</strong> عرض وتحليل أداء الجهات المسؤولة.</li>
+        </ul>
+
+        <h4>🔎 ملاحظات:</h4>
+        <p>يمكنك استخدام مؤشرات الأداء (KPIs) لمتابعة تقدم التقييمات بشكل مباشر، ومعرفة نسبة الإنجاز والملاحظات المفتوحة والمغلقة.</p>
+    </div>
+</div>
+
+<style>
+/* ===================== أيقونات ===================== */
+.app-info-icon,
+.help-icon {
+    position: fixed;
+    right: 20px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    transition: transform 0.3s;
+    z-index: 1000;
+}
+
+.app-info-icon { top: 20px; background: #0d6efd; color: #fff; }
+.help-icon { top: 70px; background: #ffc107; color: #fff; }
+
+.app-info-icon:hover,
+.help-icon:hover { transform: scale(1.1); }
+
+/* ===================== النوافذ (مودال) ===================== */
+.app-info-modal,
+.help-modal {
+    visibility: hidden;
+    opacity: 0;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    z-index: 999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.app-info-modal.active,
+.help-modal.active {
+    visibility: visible;
+    opacity: 1;
+}
+
+.app-info-content,
+.help-content {
+    background: #fff;
+    padding: 20px 30px;
+    border-radius: 12px;
+    max-width: 90%;
+    text-align: right;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    position: relative;
+}
+
+.app-info-content { width: 350px; }
+.help-content { width: 600px; max-height: 80vh; overflow-y: auto; line-height: 1.8; }
+
+.close {
+    position: absolute;
+    top: 10px;
+    left: 15px;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #333;
+}
+
+    /* ===================== ألوان المستخدم العادي ===================== */
+.user-feature-card {
+    border: 2px solid #f8f9fa;
+}
+
+.user-bg-evaluations {
+    background: linear-gradient(135deg, #42a5f5, #64b5f6); /* أزرق فاتح */
+}
+.user-bg-report-evaluation {
+    background: linear-gradient(135deg, #66bb6a, #81c784); /* أخضر فاتح */
+}
+.user-bg-report-responsibility {
+    background: linear-gradient(135deg, #ffb74d, #ffcc80); /* برتقالي فاتح */
+}
+
+</style>
+
+<script>
+function toggleAppInfo() {
+    document.getElementById('appInfoModal').classList.toggle('active');
+}
+
+function toggleHelp() {
+    document.getElementById('helpModal').classList.toggle('active');
+}
+</script>
+
+{% endblock %}
+
+{% block styles %}
+<style>
+/* ===================== البطاقات ===================== */
+.feature-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 15px;
+    color: #fff;
+    font-weight: bold;
+    text-decoration: none;
+    padding: 15px;
+    width: 140px;
+    height: 140px;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+.feature-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+}
+
+/* ===================== الأيقونات الدائرية ===================== */
+.icon-circle {
+    background: rgba(255, 255, 255, 0.2);
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 12px;
+    font-size: 1.8rem;
+    transition: background 0.3s;
+}
+.feature-card:hover .icon-circle {
+    background: rgba(255, 255, 255, 0.4);
+}
+
+/* ===================== ألوان التدرج للبطاقات ===================== */
+.bg-evaluations { background: linear-gradient(45deg, #198754, #20c997); }
+.bg-users { background: linear-gradient(45deg, #0dcaf0, #0d6efd); }
+.bg-authorities { background: linear-gradient(45deg, #ffc107, #fd7e14); }
+.bg-locations { background: linear-gradient(45deg, #6c757d, #343a40); }
+.bg-criteria { background: linear-gradient(45deg, #198754, #20c997); }
+
+.bg-report-evaluation { background: linear-gradient(135deg, #ff758c, #ff7eb3); }
+.bg-report-general { background: linear-gradient(135deg, #6a11cb, #2575fc); }
+.bg-report-responsibility { background: linear-gradient(135deg, #43e97b, #38f9d7); }
+
+/* ===================== بطاقة المستخدم ===================== */
+.user-card {
+    background: #f8f9fa;
+    max-width: 350px;
+}
+.user-name {
+    font-size: 1.1rem;
+}
+
+/* ===================== زر الطباعة ===================== */
+.print-card-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    background: linear-gradient(45deg, #28a745, #20c997);
+    color: #fff;
+    font-weight: bold;
+    border-radius: 12px;
+    text-decoration: none;
+    font-size: 0.95rem;
+    transition: all 0.3s ease-in-out;
+}
+.print-card-btn:hover {
+    background: linear-gradient(45deg, #20c997, #198754);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 15px rgba(0,0,0,0.2);
+}
+.print-card-btn i {
+    font-size: 1.2rem;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js"></script>
+{% endblock %}

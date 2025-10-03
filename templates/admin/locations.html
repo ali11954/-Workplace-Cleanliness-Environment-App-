@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}إدارة المناطق والمواقع والأماكن{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4 text-center text-primary fw-bold">إدارة المناطق والمواقع والأماكن</h2>
+
+    <!-- رسائل الفلاش -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <!-- النماذج -->
+    <div class="row mb-5">
+        <!-- إضافة منطقة -->
+        <div class="col-md-4 mb-4">
+            <div class="card shadow-sm border-0" style="background-color:#e9f7ef; border-left:5px solid #28a745;">
+                <div class="card-header fw-bold" style="background-color:#28a745; color:white;">➕ إضافة منطقة جديدة</div>
+                <div class="card-body">
+                    <form method="post">
+                        {{ form_region.hidden_tag() }}
+                        <div class="mb-3">
+                            {{ form_region.name.label(class="form-label") }}
+                            {{ form_region.name(class="form-control shadow-sm", placeholder="اسم المنطقة") }}
+                        </div>
+                        <button type="submit" name="submit_region" class="btn btn-success w-100">إضافة المنطقة</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- إضافة موقع -->
+        <div class="col-md-4 mb-4">
+            <div class="card shadow-sm border-0" style="background-color:#e9f7ef; border-left:5px solid #28a745;">
+                <div class="card-header fw-bold" style="background-color:#28a745; color:white;">➕ إضافة موقع جديد</div>
+                <div class="card-body">
+                    <form method="post">
+                        {{ form_site.hidden_tag() }}
+                        <div class="mb-3">
+                            {{ form_site.name.label(class="form-label") }}
+                            {{ form_site.name(class="form-control shadow-sm", placeholder="اسم الموقع") }}
+                        </div>
+                        <div class="mb-3">
+                            {{ form_site.region_id.label(class="form-label") }}
+                            {{ form_site.region_id(class="form-select shadow-sm") }}
+                        </div>
+                        <button type="submit" name="submit_site" class="btn btn-success w-100">إضافة الموقع</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- إضافة مكان -->
+        <div class="col-md-4 mb-4">
+            <div class="card shadow-sm border-0" style="background-color:#fff3e6; border-left:5px solid #28a745;">
+                <div class="card-header fw-bold" style="background-color:#28a745; color:white;">➕ إضافة مكان جديد</div>
+                <div class="card-body">
+                    <form method="post">
+                        {{ form_place.hidden_tag() }}
+                        <div class="mb-3">
+                            {{ form_place.name.label(class="form-label") }}
+                            {{ form_place.name(class="form-control shadow-sm", placeholder="اسم المكان") }}
+                        </div>
+                        <div class="mb-3">
+                            {{ form_place.site_id.label(class="form-label") }}
+                            {{ form_place.site_id(class="form-select shadow-sm") }}
+                        </div>
+                        <button type="submit" name="submit_place" class="btn btn-success w-100">إضافة المكان</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- الهيكل الحالي -->
+    <h3 class="mb-4 text-secondary">🏗️ الهيكل الحالي للمناطق والمواقع والأماكن</h3>
+
+    {% if locations %}
+        <div class="row g-4">
+        {% for location in locations %}
+            <div class="col-md-12">
+                <div class="card shadow border-0" style="background-color:#e9f7ef; border-left:5px solid #28a745;">
+                    <div class="card-header fw-bold" style="background-color:#28a745; color:white;">
+                        🌍 {{ location.name }}
+                    </div>
+                    <div class="card-body">
+                        <!-- تعديل وحذف المنطقة -->
+                        <div class="mb-3 d-flex gap-2 flex-wrap align-items-start">
+                            <form method="POST" action="{{ url_for('edit_location', location_id=location.id) }}" class="flex-grow-1 d-flex gap-2">
+                                <input type="text" name="new_name" class="form-control shadow-sm" value="{{ location.name }}" required>
+                                <button type="submit" class="btn btn-sm btn-success">✏️ تعديل</button>
+                                <button type="submit" formaction="{{ url_for('delete_location', location_id=location.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('هل أنت متأكد من حذف المنطقة؟');">🗑️ حذف</button>
+                            </form>
+                        </div>
+
+                        {% if location.sites %}
+                        <div class="row g-3 mt-3">
+                            {% for site in location.sites %}
+                            <div class="col-md-6">
+                                <div class="card border-success shadow-sm h-100" style="background-color:#d4edda;">
+                                    <div class="card-header fw-bold" style="background-color:#28a745; color:white;">
+                                        📌 {{ site.name }}
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="mb-2 d-flex gap-2 flex-wrap align-items-start">
+                                            <form method="POST" action="{{ url_for('edit_site', site_id=site.id) }}" class="flex-grow-1 d-flex gap-2">
+                                                <input type="text" name="new_name" class="form-control shadow-sm" value="{{ site.name }}" required>
+                                                <button type="submit" class="btn btn-sm btn-success">✏️ تعديل</button>
+                                                <button type="submit" formaction="{{ url_for('delete_site', site_id=site.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('هل أنت متأكد من حذف الموقع؟');">🗑️ حذف</button>
+                                            </form>
+                                        </div>
+
+                                        {% if site.places %}
+                                        <div class="row g-2 mt-2">
+                                            {% for place in site.places %}
+                                            <div class="col-md-12">
+                                                <div class="card border-warning shadow-sm" style="background-color:#fff3e6;">
+                                                    <div class="card-header fw-bold text-dark" style="background-color:#28a745; color:white;">
+                                                        🏠 {{ place.name }}
+                                                    </div>
+                                                    <div class="card-body d-flex gap-2 flex-wrap align-items-start">
+                                                        <form method="POST" action="{{ url_for('edit_place', place_id=place.id) }}" class="flex-grow-1 d-flex gap-2">
+                                                            <input type="text" name="new_name" class="form-control shadow-sm" value="{{ place.name }}" required>
+                                                            <button type="submit" class="btn btn-sm btn-success">✏️ تعديل</button>
+                                                            <button type="submit" formaction="{{ url_for('delete_place', place_id=place.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('هل أنت متأكد من حذف المكان؟');">🗑️ حذف</button>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        {% endif %}
+
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="text-muted">لا يوجد مواقع في هذه المنطقة.</p>
+                        {% endif %}
+
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+        </div>
+    {% else %}
+        <p class="text-muted">لا توجد مناطق مضافة بعد.</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+{% endblock %}

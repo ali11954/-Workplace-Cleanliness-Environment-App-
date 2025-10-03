@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% block title %}{% if form.fullname.data %}تعديل مستخدم{% else %}إضافة مستخدم{% endif %}{% endblock %}
+{% block content %}
+<h2 class="mb-4">{% if form.fullname.data %}تعديل مستخدم{% else %}إضافة مستخدم{% endif %}</h2>
+<form method="POST" novalidate>
+    {{ form.hidden_tag() }}
+
+    <div class="mb-3">
+        {{ form.fullname.label(class="form-label") }}
+        {{ form.fullname(class="form-control", placeholder="الاسم الكامل") }}
+        {% for error in form.fullname.errors %}
+            <div class="text-danger small">{{ error }}</div>
+        {% endfor %}
+    </div>
+
+    <div class="mb-3">
+        {{ form.username.label(class="form-label") }}
+        {{ form.username(class="form-control", placeholder="اسم المستخدم") }}
+        {% for error in form.username.errors %}
+            <div class="text-danger small">{{ error }}</div>
+        {% endfor %}
+    </div>
+
+    <div class="mb-3">
+        {{ form.password.label(class="form-label") }}
+        {{ form.password(class="form-control", placeholder="كلمة المرور") }}
+        {% for error in form.password.errors %}
+            <div class="text-danger small">{{ error }}</div>
+        {% endfor %}
+    </div>
+
+    <div class="mb-3">
+        {{ form.password_confirm.label(class="form-label") }}
+        {{ form.password_confirm(class="form-control", placeholder="تأكيد كلمة المرور") }}
+        {% for error in form.password_confirm.errors %}
+            <div class="text-danger small">{{ error }}</div>
+        {% endfor %}
+    </div>
+
+    <div class="mb-3">
+        {{ form.role.label(class="form-label") }}
+        {{ form.role(class="form-select") }}
+    </div>
+
+    <div class="mb-3">
+        {{ form.active.label(class="form-label") }}
+        {{ form.active(class="form-select") }}
+    </div>
+
+    <button type="submit" class="btn btn-primary">{{ form.submit.label.text }}</button>
+    <a href="{{ url_for('users') }}" class="btn btn-secondary">إلغاء</a>
+</form>
+{% endblock %}

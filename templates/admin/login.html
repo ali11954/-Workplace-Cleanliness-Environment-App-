@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8" />
+    <title>تسجيل الدخول - تقييم بيئة العمل والنظافة</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+            background: linear-gradient(to bottom, #e6f2ff, #ffffff);
+            direction: rtl;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 500px;
+            margin: 80px auto;
+            background: #ffffff;
+            padding: 35px 40px;
+            border-radius: 15px;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.15);
+            transition: 0.3s;
+        }
+        .container:hover {
+            box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+        }
+        h2 {
+            text-align: center;
+            margin-bottom: 10px;
+            color: #28a745;
+            font-size: 2rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+        }
+        p.welcome {
+            text-align: center;
+            margin-bottom: 25px;
+            color: #555;
+            font-size: 1rem;
+        }
+        label {
+            display: block;
+            margin-top: 15px;
+            font-weight: bold;
+            color: #333;
+        }
+        input[type=text], input[type=password] {
+            width: 100%;
+            padding: 12px;
+            margin-top: 5px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            box-sizing: border-box;
+            transition: 0.3s;
+            font-size: 1rem;
+        }
+        input[type=text]:focus, input[type=password]:focus {
+            border-color: #28a745;
+            box-shadow: 0 0 8px rgba(40,167,69,0.3);
+            outline: none;
+        }
+        .btn {
+            margin-top: 25px;
+            width: 100%;
+            padding: 14px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+        .btn:hover {
+            background-color: #218838;
+        }
+        .flash {
+            padding: 12px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            font-weight: bold;
+            text-align: center;
+            font-size: 0.95rem;
+        }
+        .flash-success { background-color: #d4edda; color: #155724; }
+        .flash-danger { background-color: #f8d7da; color: #721c24; }
+        .flash-warning { background-color: #fff3cd; color: #856404; }
+        .flash-info { background-color: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>🌿 تطبيق تقييم بيئة العمل والنظافة 🌿</h2>
+        <p class="welcome">مرحباً! يرجى تسجيل الدخول للبدء في تقييم بيئة العمل والنظافة.</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="flash flash-{{ category }}">{{ message }}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('login') }}">
+            {{ form.hidden_tag() }}
+
+            <label for="username">{{ form.username.label.text }}</label>
+            {{ form.username(size=32, class_="form-control") }}
+
+            <label for="password">{{ form.password.label.text }}</label>
+            {{ form.password(size=32, class_="form-control") }}
+
+            {{ form.submit(class_="btn") }}
+        </form>
+    </div>
+</body>
+</html>

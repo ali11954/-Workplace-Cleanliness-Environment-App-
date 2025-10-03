@@ -1,0 +1,79 @@
+{% extends "admin/dashboard.html" %}
+{% block content %}
+<div class="container mt-4" dir="rtl">
+    <h3 class="mb-4">تقرير التقييمات</h3>
+
+    <form method="get" action="{{ url_for('reports') }}" class="row g-3 mb-4">
+        <div class="col-md-3">
+            <label for="start_date" class="form-label">من تاريخ</label>
+            <input type="date" id="start_date" name="start_date" class="form-control" value="{{ start_date }}">
+        </div>
+
+        <div class="col-md-3">
+            <label for="end_date" class="form-label">إلى تاريخ</label>
+            <input type="date" id="end_date" name="end_date" class="form-control" value="{{ end_date }}">
+        </div>
+
+        <div class="col-md-3">
+            <label for="region_id" class="form-label">المنطقة</label>
+            <select id="region_id" name="region_id" class="form-select">
+                <option value="">-- اختر المنطقة --</option>
+                {% for location in locations %}
+                    <option value="{{ location.id }}" {% if selected_region_id == location.id %}selected{% endif %}>
+                        {{ location.name }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-md-3">
+            <label for="user_id" class="form-label">المقيم</label>
+            <select id="user_id" name="user_id" class="form-select">
+                <option value="">-- اختر المستخدم --</option>
+                {% for user in users %}
+                    <option value="{{ user.id }}" {% if selected_user_id == user.id %}selected{% endif %}>
+                        {{ user.username }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-md-12 text-end">
+            <button type="submit" class="btn btn-primary">تصفية</button>
+        </div>
+    </form>
+
+    {% if evaluations %}
+    <div class="table-responsive">
+        <table class="table table-bordered text-center align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>التاريخ</th>
+                    <th>المنطقة</th>
+                    <th>الموقع</th>
+                    <th>المكان</th>
+                    <th>المعيار</th>
+                    <th>المستخدم</th>
+                    <th>الدرجة</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for eval in evaluations %}
+                <tr>
+                    <td>{{ eval.evaluation.date.strftime('%Y-%m-%d') if eval.evaluation and eval.evaluation.date else '-' }}</td>
+                    <td>{{ eval.evaluation.region.name if eval.evaluation and eval.evaluation.region else '-' }}</td>
+                    <td>{{ eval.evaluation.place.site.name if eval.evaluation and eval.evaluation.place and eval.evaluation.place.site else '-' }}</td>
+                    <td>{{ eval.evaluation.place.name if eval.evaluation and eval.evaluation.place else '-' }}</td>
+                    <td>{{ eval.criterion.name if eval.criterion else '-' }}</td>
+                    <td>{{ eval.evaluation.user.fullname if eval.evaluation and eval.evaluation.user else '-' }}</td>
+                    <td>{{ eval.score }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+        <div class="alert alert-warning text-center">لا توجد بيانات لعرضها.</div>
+    {% endif %}
+</div>
+{% endblock %}

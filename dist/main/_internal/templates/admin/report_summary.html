@@ -1,0 +1,34 @@
+{% extends 'admin/dashboard.html' %}
+{% block content %}
+<div class="container mt-4">
+  <h2 class="mb-4">ملخص التقييمات حسب المناطق</h2>
+
+  {% for region, sites in grouped_data.items() %}
+    <div class="card mb-3">
+      <div class="card-header bg-primary text-white">
+        {{ region }}
+      </div>
+      <div class="card-body">
+        {% for site, places in sites.items() %}
+          <h5 class="mt-3 text-success">{{ site }}</h5>
+          {% for place, details in places.items() %}
+            <div class="mb-2 p-2 border rounded">
+              <strong>{{ place }}</strong>
+              <ul>
+                {% for detail in details %}
+                  <li>
+                    المستخدم: {{ detail.evaluation.user.name if detail.evaluation.user else "غير معروف" }},
+                    التاريخ: {{ detail.evaluation.date }},
+                    التقييم: {{ detail.score }},
+                    الملاحظة: {{ detail.note or "لا توجد" }}
+                  </li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endfor %}
+        {% endfor %}
+      </div>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

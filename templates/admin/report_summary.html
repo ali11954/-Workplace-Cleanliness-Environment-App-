@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4" dir="rtl">
+    <h3 class="mb-4 text-center text-primary fw-bold">تقرير تقييم السكنات</h3>
+
+    <!-- فلترة التواريخ -->
+    <form method="get" class="row g-3 mb-4 align-items-end">
+        <div class="col-md-3">
+            <label for="start_date" class="form-label fw-bold">من تاريخ</label>
+            <input type="date" class="form-control" id="start_date" name="start_date" value="{{ request.args.get('start_date', '') }}">
+        </div>
+        <div class="col-md-3">
+            <label for="end_date" class="form-label fw-bold">إلى تاريخ</label>
+            <input type="date" class="form-control" id="end_date" name="end_date" value="{{ request.args.get('end_date', '') }}">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">&nbsp;</label>
+            <button type="submit" class="btn btn-primary w-100 fw-bold">تطبيق الفلتر</button>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">&nbsp;</label>
+            <a href="{{ url_for('report_summary') }}" class="btn btn-secondary w-100 fw-bold">عرض الكل</a>
+        </div>
+    </form>
+
+    {% if grouped_data %}
+        <!-- جدول خلاصة التقييمات لكل منطقة -->
+        <div class="card mb-4 shadow-sm rounded-4 border-0">
+            <div class="card-header" style="background-color:#d4edda; color:black; font-weight:bold; text-align:center;">
+                خلاصة التقييمات لكل منطقة
+            </div>
+            <div class="card-body">
+                <table class="table table-bordered table-striped table-hover text-center align-middle">
+                    <thead style="background-color:#d4edda; color:black; font-weight:bold;">
+                        <tr>
+                            <th>المنطقة</th>
+                            <th>الموقع</th>
+                            <th>إجمالي الدرجات</th>
+                            <th>إجمالي المعايير</th>
+                            <th>النسبة المئوية</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for region_name, region_details in grouped_data | groupby('region') %}
+                            {% set region_filtered = [] %}
+                            {% for detail in region_details %}
+                                {% if (not request.args.get('start_date') or detail.date >= request.args.get('start_date')) and
+                                      (not request.args.get('end_date') or detail.date <= request.args.get('end_date')) %}
+                                    {% set _ = region_filtered.append(detail) %}
+                                {% endif %}
+                            {% endfor %}
+
+                            {% set region_total_scores = region_filtered | sum(attribute='score') %}
+                            {% set region_total_criteria = region_filtered | length %}
+                            {% set region_total_possible = region_total_criteria * 10 %}
+                            {% set region_percentage = (region_total_scores / region_total_possible * 100) if region_total_possible > 0 else 0 %}
+
+                            {% for site_name, site_details in region_filtered | groupby('site') %}
+                                {% set site_total_scores = site_details | sum(attribute='score') %}
+                                {% set site_total_criteria = site_details | length %}
+                                {% set site_total_possible = site_total_criteria * 10 %}
+                                {% set site_percentage = (site_total_scores / site_total_possible * 100) if site_total_possible > 0 else 0 %}
+                                <tr style="background-color:#e9f7ef;">
+                                    <td>{{ region_name or '-' }}</td>
+                                    <td>{{ site_name or '-' }}</td>
+                                    <td>{{ site_total_scores }}</td>
+                                    <td>{{ site_total_criteria }}</td>
+                                    <td>{{ site_percentage | round(2) }}%</td>
+                                </tr>
+                            {% endfor %}
+
+                            <tr style="background-color:#d4edda; font-weight:bold;">
+                                <td colspan="2">إجمالي المنطقة: {{ region_name or '-' }}</td>
+                                <td>{{ region_total_scores }}</td>
+                                <td>{{ region_total_criteria }}</td>
+                                <td>{{ region_percentage | round(2) }}%</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- بطاقات التفاصيل لكل منطقة -->
+        {% for region_name, region_details in grouped_data | groupby('region') %}
+            {% set region_filtered = [] %}
+            {% for detail in region_details %}
+                {% if (not request.args.get('start_date') or detail.date >= request.args.get('start_date')) and
+                      (not request.args.get('end_date') or detail.date <= request.args.get('end_date')) %}
+                    {% set _ = region_filtered.append(detail) %}
+                {% endif %}
+            {% endfor %}
+            {% set region_total_scores = region_filtered | sum(attribute='score') %}
+            {% set region_total_criteria = region_filtered | length %}
+            {% set region_percentage = (region_total_scores / (region_total_criteria*10) * 100) if region_total_criteria > 0 else 0 %}
+
+            <div class="card mb-4 shadow-sm rounded-4 border-0">
+                <div class="card-header fw-bold d-flex justify-content-between align-items-center" style="background-color:#d4edda; color:black;">
+                    <span>المنطقة: {{ region_name or '-' }}</span>
+                    <span>إجمالي تقييمات المنطقة: {{ region_total_criteria }} | النسبة المئوية: {{ region_percentage | round(2) }}%</span>
+                </div>
+                <div class="card-body bg-white text-dark rounded-bottom shadow-sm p-4">
+                    {% for site_name, site_details in region_filtered | groupby('site') %}
+                        {% set site_total_scores = site_details | sum(attribute='score') %}
+                        {% set site_total_criteria = site_details | length %}
+                        {% set site_percentage = (site_total_scores / (site_total_criteria*10) * 100) if site_total_criteria > 0 else 0 %}
+
+                        <div class="card mb-3 shadow-sm rounded-3 border-success">
+                            <div class="card-header" style="background-color:#d4edda; color:black; font-weight:bold;">
+                                الموقع: {{ site_name or '-' }} | إجمالي تقييمات الموقع: {{ site_total_criteria }} | النسبة المئوية: {{ site_percentage | round(2) }}%
+                            </div>
+                            <div class="card-body">
+                                {% for place_name, place_details in site_details | groupby('place') %}
+                                    {% set place_total_scores = place_details | sum(attribute='score') %}
+                                    {% set place_total_criteria = place_details | length %}
+                                    {% set place_percentage = (place_total_scores / (place_total_criteria*10) * 100) if place_total_criteria > 0 else 0 %}
+
+                                    <div class="mb-3">
+                                        <h6 class="fw-bold text-success">
+                                            المكان: {{ place_name or '-' }} | إجمالي الدرجات: {{ place_total_scores }} | النسبة المئوية: {{ place_percentage | round(2) }}%
+                                        </h6>
+                                        <div class="table-responsive">
+                                            <table class="table table-bordered table-striped table-hover text-center align-middle">
+                                                <!-- هنا قمنا بتغيير الهيدر لكل جدول -->
+                                                <thead style="background-color:#d4edda; color:black; font-weight:bold;">
+                                                    <tr>
+                                                        <th>المعيار</th>
+                                                        <th>الموظف</th>
+                                                        <th>التاريخ</th>
+                                                        <th>الدرجة</th>
+                                                        <th>الملاحظة</th>
+                                                        <th>جهة المسؤولية</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for detail in place_details %}
+                                                        <tr style="background-color:#e9f7ef;">
+                                                            <td>{{ detail.criterion or '-' }}</td>
+                                                            <td>{{ detail.user or '-' }}</td>
+                                                            <td>
+                                                                {% if detail.date %}
+                                                                    {% if detail.date is string %}
+                                                                        {{ detail.date }}
+                                                                    {% else %}
+                                                                        {{ detail.date.strftime('%Y-%m-%d') }}
+                                                                    {% endif %}
+                                                                {% else %}
+                                                                    -
+                                                                {% endif %}
+                                                            </td>
+                                                            <td>{{ detail.score or '-' }}</td>
+                                                            <td>{{ detail.note or '' }}</td>
+                                                            <td>{{ detail.authority or '-' }}</td>
+                                                        </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endfor %}
+
+                    <div class="alert" style="background-color:#d4edda; color:#155724; font-weight:bold; text-align:center;">
+                        إجمالي المنطقة: {{ region_name or '-' }} | إجمالي الدرجات: {{ region_total_scores }} | إجمالي التقييمات: {{ region_total_criteria }} | النسبة المئوية: {{ region_percentage | round(2) }}%
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+
+    {% else %}
+        <div class="alert alert-warning text-center fw-bold">لا توجد بيانات لعرضها.</div>
+    {% endif %}
+</div>
+{% endblock %}

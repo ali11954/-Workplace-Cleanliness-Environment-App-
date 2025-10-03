@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}تعديل المعيار{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4 text-primary fw-bold">تعديل المعيار</h2>
+
+    <form method="post" class="mb-4 p-3 border rounded shadow-sm" style="background-color: #f0f9f5;">
+        <div class="row g-3 align-items-end">
+            <!-- اختيار المكان -->
+            <div class="col-md-3">
+                <label for="place_id" class="form-label fw-bold">اختر المكان</label>
+                <select id="place_id" name="place_id" class="form-select" required>
+                    {% for location in locations %}
+                        <optgroup label="{{ location.name }}">
+                            {% for site in location.sites %}
+                                {% for place in site.places %}
+                                    <option value="{{ place.id }}" {% if place.id == criterion.place_id %}selected{% endif %}>
+                                        {{ location.name }} / {{ site.name }} / {{ place.name }}
+                                    </option>
+                                {% endfor %}
+                            {% endfor %}
+                        </optgroup>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- اسم المعيار -->
+            <div class="col-md-3">
+                <label for="name" class="form-label fw-bold">اسم المعيار</label>
+                <input type="text" name="name" id="name" class="form-control" required value="{{ criterion.name }}">
+            </div>
+
+            <!-- الحد الأدنى -->
+            <div class="col-md-2">
+                <label for="min_score" class="form-label fw-bold">الحد الأدنى</label>
+                <input type="number" name="min_score" id="min_score" class="form-control" step="0.01" required value="{{ criterion.min_score }}">
+            </div>
+
+            <!-- الحد الأعلى -->
+            <div class="col-md-2">
+                <label for="max_score" class="form-label fw-bold">الحد الأعلى</label>
+                <input type="number" name="max_score" id="max_score" class="form-control" step="0.01" required value="{{ criterion.max_score }}">
+            </div>
+
+            <!-- جهة المسؤولية -->
+            <div class="col-md-2">
+                <label for="authority_id" class="form-label fw-bold">جهة المسؤولية</label>
+                <select id="authority_id" name="authority_id" class="form-select" required>
+                    {% for auth in authorities %}
+                        <option value="{{ auth.id }}" {% if auth.id == criterion.authority_id %}selected{% endif %}>{{ auth.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- أزرار الحفظ والإلغاء -->
+            <div class="col-md-12 mt-3 d-flex gap-2">
+                <button type="submit" class="btn btn-success shadow-sm">💾 حفظ التعديلات</button>
+                <a href="{{ url_for('criteria') }}" class="btn btn-secondary shadow-sm">❌ إلغاء</a>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<style>
+body { font-family: Arial, sans-serif; direction: rtl; margin: 20px; }
+h2 { text-align: center; color: #198754; margin-bottom: 10px; }
+table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+th, td { border: 1px solid #333; padding: 6px; text-align: center; }
+th { background-color: #e0f7e0; }
+.place-cell { text-align: right; font-weight: bold; background-color: #f0fff0; }
+.header-info { text-align: center; margin-bottom: 20px; }
+.header-info img { max-height: 80px; margin-bottom: 10px; }
+.info-row { margin-bottom: 5px; font-weight: bold; }
+
+/* ترقيم الصفحات عند الطباعة */
+@media print {
+    @page { size: auto; margin: 20mm; }
+    footer { position: fixed; bottom: 0; width: 100%; text-align: center; font-weight: bold; }
+    body { counter-reset: page; }
+    footer::after { counter-increment: page; content: "صفحة " counter(page); }
+}
+</style>
+</head>
+<body>
+
+<div class="header-info">
+    <img src="{{ url_for('static', filename='logo.png') }}" alt="شعار الشركة">
+    <div class="info-row">اسم التطبيق: نموذج عرض المعايير</div>
+    <div class="info-row">المصمم: علي أحمد علي</div>
+    <div class="info-row">المنطقة: {{ region.name if region else '-' }}</div>
+    <div class="info-row">التاريخ: ________ &nbsp;&nbsp; اليوم: ________</div>
+</div>
+
+<h2>نموذج عرض المعايير: {{ user.fullname }}</h2>
+
+{% if evaluation_details %}
+    {% for region_name, details in evaluation_details_by_region.items() %}
+        <div style="margin-bottom: 40px;">
+            <h3 style="text-align:center; color:#198754; margin-bottom:10px;">المنطقة: {{ region_name }}</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>الموقع</th>
+                        <th>المكان</th>
+                        <th>المعيار</th>
+                        <th>الدرجة الأدنى</th>
+                        <th>الدرجة العليا</th>
+                        <th>جهة المسؤولية</th>
+                        <th>تقييم يومي</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for detail in details %}
+                    <tr>
+                        <td>{{ detail.site_name }}</td>
+                        <td class="place-cell">{{ detail.place_name }}</td>
+                        <td>{{ detail.criterion_name }}</td>
+                        <td>{{ detail.min_score }}</td>
+                        <td>{{ detail.max_score }}</td>
+                        <td>{{ detail.authority_name }}</td>
+                        <td></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endfor %}
+    <footer></footer>
+{% else %}
+    <div style="text-align:center; color:#dc3545; font-weight:bold; margin-top:20px;">
+        لا توجد بيانات للعرض للمستخدم.
+    </div>
+{% endif %}
+
+<h2>نموذج عرض المعايير: {{ user.fullname }}</h2>
+
+{% if evaluation_details %}
+<table>
+    <thead>
+        <tr>
+            <th>الموقع</th>
+            <th>المكان</th>
+            <th>المعيار</th>
+            <th>الدرجة الأدنى</th>
+            <th>الدرجة العليا</th>
+            <th>جهة المسؤولية</th>
+            <th>تقييم يومي</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for detail in evaluation_details %}
+        <tr>
+            <td>{{ detail.site_name }}</td>
+            <td class="place-cell">{{ detail.place_name }}</td>
+            <td>{{ detail.criterion_name }}</td>
+            <td>{{ detail.min_score }}</td>
+            <td>{{ detail.max_score }}</td>
+            <td>{{ detail.authority_name }}</td>
+            <td></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<footer></footer>
+{% else %}
+<div style="text-align:center; color:#dc3545; font-weight:bold; margin-top:20px;">
+    لا توجد بيانات للعرض في منطقة المستخدم.
+</div>
+{% endif %}
+
+</body>
+</html>

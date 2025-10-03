@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8" />
+    <title>تسجيل الدخول</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f0f0f0; direction: rtl; }
+        .container { max-width: 400px; margin: 50px auto; background: white; padding: 20px; border-radius: 6px; box-shadow: 0 0 10px #ccc; }
+        h2 { text-align: center; margin-bottom: 20px; }
+        label { display: block; margin-top: 10px; }
+        input[type=text], input[type=password] {
+            width: 100%; padding: 8px; margin-top: 5px; box-sizing: border-box;
+        }
+        .btn {
+            margin-top: 20px; width: 100%; padding: 10px; background-color: #007bff; color: white; border: none; cursor: pointer;
+            border-radius: 4px;
+        }
+        .btn:hover {
+            background-color: #0056b3;
+        }
+        .flash {
+            padding: 10px; margin-bottom: 15px; border-radius: 4px;
+        }
+        .flash-success { background-color: #d4edda; color: #155724; }
+        .flash-danger { background-color: #f8d7da; color: #721c24; }
+        .flash-warning { background-color: #fff3cd; color: #856404; }
+        .flash-info { background-color: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>تسجيل الدخول</h2>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="flash flash-{{ category }}">{{ message }}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('login') }}">
+            {{ form.hidden_tag() }}
+
+            <label for="username">{{ form.username.label.text }}</label>
+            {{ form.username(size=32) }}
+
+            <label for="password">{{ form.password.label.text }}</label>
+            {{ form.password(size=32) }}
+
+            {{ form.submit(class_="btn") }}
+        </form>
+    </div>
+</body>
+</html>

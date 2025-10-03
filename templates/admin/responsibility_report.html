@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4" dir="rtl">
+    <h3 class="mb-4 text-center text-primary fw-bold">تقرير تقييم جهات المسؤولية مع التحليل</h3>
+
+    <!-- نموذج الفلاتر -->
+    <form method="get" action="{{ url_for('responsibility_report') }}" class="row g-3 mb-4">
+        <div class="col-md-3">
+            <label class="form-label fw-bold">من تاريخ</label>
+            <input type="date" name="start_date" class="form-control" value="{{ start_date }}">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label fw-bold">إلى تاريخ</label>
+            <input type="date" name="end_date" class="form-control" value="{{ end_date }}">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label fw-bold">المنطقة</label>
+            <select name="region_id" class="form-select">
+                <option value="">-- اختر المنطقة --</option>
+                {% for location in locations %}
+                <option value="{{ location.id }}" {% if selected_region_id == location.id %}selected{% endif %}>{{ location.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label fw-bold">المستخدم</label>
+            <select name="user_id" class="form-select">
+                <option value="">-- اختر المستخدم --</option>
+                {% for user in users %}
+                <option value="{{ user.id }}" {% if selected_user_id == user.id %}selected{% endif %}>{{ user.fullname }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-12 text-end mt-2">
+            <button type="submit" class="btn btn-primary fw-bold">تصفية</button>
+        </div>
+    </form>
+
+    {% if grouped_by_authority %}
+    <!-- جدول ملخص الجهات -->
+    <div class="table-responsive mb-4">
+        <table class="table table-bordered table-striped text-center align-middle shadow-sm rounded" style="border-color:#198754;">
+            <thead style="background-color:#28a745; color:white;">
+                <tr>
+                    <th>جهة المسؤولية</th>
+                    <th>إجمالي التقييمات</th>
+                    <th>متوسط الدرجة (%)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for authority, details in grouped_by_authority.items() %}
+                <tr style="background-color:#e9f7ef;">
+                    <td>{{ authority }}</td>
+                    <td>{{ stats[authority].total_count }}</td>
+                    <td>{{ (stats[authority].avg_score / 10 * 100) | round(2) }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- بطاقات كل جهة -->
+    {% for authority, details in grouped_by_authority.items() %}
+        {% set total_count = stats[authority].total_count %}
+        {% set avg_score = stats[authority].avg_score %}
+        {% set best_eval = details | max(attribute='score') %}
+
+        <div class="card mb-4 shadow-lg rounded-4 border-0" style="background-color:#198754; color:white;">
+            <div class="card-header d-flex justify-content-between align-items-center fw-bold">
+                <span>جهة المسؤولية: {{ authority }}</span>
+                <span>إجمالي التقييمات: {{ total_count }} | متوسط الدرجة: {{ (avg_score / 10 * 100) | round(2) }}%</span>
+            </div>
+            <div class="card-body bg-white text-dark rounded-bottom shadow-sm p-4">
+                <!-- جدول التفاصيل -->
+                <div class="table-responsive mb-3">
+                    <table class="table table-bordered table-striped table-hover text-center align-middle" style="border-color:#198754;">
+                        <thead style="background-color:#28a745; color:white;">
+                            <tr>
+                                <th>التاريخ</th>
+                                <th>المنطقة</th>
+                                <th>الموقع</th>
+                                <th>المكان</th>
+                                <th>المعيار</th>
+                                <th>المستخدم</th>
+                                <th>الدرجة</th>
+                                <th>الملاحظة</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for detail in details %}
+                            <tr style="background-color:#e9f7ef;">
+                                <td>{{ detail.timestamp.strftime('%Y-%m-%d') if detail.timestamp else '-' }}</td>
+                                <td>{{ detail.criterion.place.site.location.name if detail.criterion and detail.criterion.place and detail.criterion.place.site and detail.criterion.place.site.location else '-' }}</td>
+                                <td>{{ detail.criterion.place.site.name if detail.criterion and detail.criterion.place and detail.criterion.place.site else '-' }}</td>
+                                <td>{{ detail.criterion.place.name if detail.criterion and detail.criterion.place else '-' }}</td>
+                                <td>{{ detail.criterion.name if detail.criterion else '-' }}</td>
+                                <td>{{ detail.user.fullname if detail.user else '-' }}</td>
+                                <td>{{ detail.score }}</td>
+                              <td>{{ detail.note if detail.note else '-' }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- قسم التحليل والمقترحات -->
+                <div class="p-3 mb-3 border rounded-3 shadow-sm" style="background-color: #f9f9f9;">
+                    <h5 class="fw-bold text-primary">تحليل ومقترحات بالذكاء الاصطناعي:</h5>
+                    <p>{{ ai_suggestions[authority] }}</p>
+                   <p>
+    أفضل أداء ضمن هذه الجهة كان بتاريخ
+    <strong>{{ best_eval.timestamp.strftime('%Y-%m-%d') if best_eval.timestamp else '-' }}</strong>
+    مع درجة <strong>{{ best_eval.score }}</strong> ({{ (best_eval.score / 10 * 100)|round(2) }}%)
+</p>
+
+                </div>
+
+                <!-- رسم بياني -->
+                {% set place_scores = {} %}
+                {% set place_counts = {} %}
+                {% for detail in details %}
+                    {% set place_name = detail.criterion.place.name if detail.criterion and detail.criterion.place else 'غير معروف' %}
+                    {% set _ = place_scores.update({place_name: (place_scores[place_name] + detail.score if place_name in place_scores else detail.score)}) %}
+                    {% set _ = place_counts.update({place_name: (place_counts[place_name] + 1 if place_name in place_counts else 1)}) %}
+                {% endfor %}
+
+                {% set chart_labels = [] %}
+                {% set chart_values = [] %}
+                {% for place_name, total in place_scores.items() %}
+                    {% set _ = chart_labels.append(place_name) %}
+                    {% set avg = (total / place_counts[place_name] / 10 * 100) | round(2) %}
+                    {% set _ = chart_values.append(avg) %}
+                {% endfor %}
+
+                {% if chart_labels %}
+                <div class="mt-3">
+                    <h5 class="mb-2 fw-bold text-primary">متوسط تقييم المعايير لكل مكان</h5>
+                    <canvas id="chart-{{ loop.index }}" class="shadow-sm rounded"></canvas>
+                </div>
+
+                <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+                <script>
+                    const ctx{{ loop.index }} = document.getElementById('chart-{{ loop.index }}').getContext('2d');
+                    new Chart(ctx{{ loop.index }}, {
+                        type: 'bar',
+                        data: {
+                            labels: {{ chart_labels | tojson }},
+                            datasets: [{
+                                label: 'متوسط الدرجة (٪ من 100)',
+                                data: {{ chart_values | tojson }},
+                                backgroundColor: 'rgba(25, 135, 84, 0.6)',  // أخضر
+                                borderColor: 'rgba(25, 135, 84, 1)',
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: { legend: { display: false } },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    max: 100,
+                                    ticks: { callback: function(value) { return value + '%'; } }
+                                }
+                            }
+                        }
+                    });
+                </script>
+                {% endif %}
+            </div>
+        </div>
+    {% endfor %}
+    {% else %}
+        <div class="alert alert-warning text-center fw-bold">لا توجد بيانات لعرضها.</div>
+    {% endif %}
+</div>
+{% endblock %}

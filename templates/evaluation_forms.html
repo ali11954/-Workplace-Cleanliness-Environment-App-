@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}نماذج التقييم{% endblock %}
+
+{% block styles %}
+<style>
+/* ===================== تصميم البطاقات ===================== */
+.user-card-wrapper {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: center;
+    margin-top: 20px;
+}
+
+.user-card {
+    background: #ffffff;
+    border-radius: 15px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    width: 250px;
+    padding: 20px;
+    text-align: center;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.user-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+}
+
+.user-name {
+    font-size: 1.1rem;
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: #198754;
+}
+
+.user-region {
+    font-size: 0.9rem;
+    margin-bottom: 15px;
+    color: #6c757d;
+}
+
+/* ===================== زر الطباعة ===================== */
+.print-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #198754, #20c997);
+    color: #fff;
+    border: none;
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    font-size: 1.4rem;
+    transition: transform 0.3s, background 0.3s;
+    cursor: pointer;
+}
+
+.print-btn:hover {
+    transform: scale(1.1);
+    background: linear-gradient(135deg, #28a745, #82e0aa);
+}
+
+/* ===================== نص الإرشادات ===================== */
+.instructions {
+    text-align: center;
+    font-size: 0.95rem;
+    color: #6c757d;
+    margin-bottom: 20px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="text-center fw-bold text-primary mb-2">نماذج التقييم</h2>
+    <p class="instructions">اختر المستخدم لطباعة نموذج التقييم الفارغ لكل منطقة وموقع وأماكنه.</p>
+
+    <div class="user-card-wrapper">
+       {% for user in users %}
+<div class="user-card">
+    <div class="user-name">{{ user.name }}</div>
+    <div class="user-region">{{ user.region.name if user.region else '-' }}</div>
+    <a href="{{ url_for('generate_user_pdf', user_id=user.id) }}" class="feature-icon-card bg-success">
+        <i class="fas fa-print"></i>
+        <span>طباعة نموذج التقييم</span>
+    </a>
+</div>
+{% endfor %}
+
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js"></script>
+{% endblock %}

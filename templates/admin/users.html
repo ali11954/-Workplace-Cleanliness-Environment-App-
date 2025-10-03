@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+{% block title %}إدارة المستخدمين{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="text-primary fw-bold">قائمة المستخدمين</h2>
+    <a href="{{ url_for('add_user') }}" class="btn btn-success shadow-sm">➕ إضافة مستخدم جديد</a>
+</div>
+
+{% if users %}
+<div class="row g-4">
+    {% for user in users %}
+    <div class="col-md-4">
+        <div class="card shadow-sm h-100 user-card">
+            <div class="card-header d-flex justify-content-between align-items-center user-card-header">
+                <span>👤 {{ user.fullname }}</span>
+                <span class="badge user-role-badge">
+                    {{ 'مشرف' if user.role == 'admin' else 'مستخدم' }}
+                </span>
+            </div>
+            <div class="card-body d-flex flex-column gap-2">
+                <p><strong>اسم المستخدم:</strong> {{ user.username }}</p>
+                <p><strong>البريد الإلكتروني:</strong> {{ user.email or 'غير محدد' }}</p>
+                <p><strong>المناطق:</strong>
+                    {% if user.regions %}
+                        {% for region in user.regions %}
+                            {{ region.name }}{% if not loop.last %}, {% endif %}
+                        {% endfor %}
+                    {% else %}
+                        غير محددة
+                    {% endif %}
+                </p>
+                <p><strong>نشط:</strong> {{ 'نعم' if user.active else 'لا' }}</p>
+
+                <div class="d-flex gap-2 flex-wrap">
+                    <a href="{{ url_for('edit_user', user_id=user.id) }}" class="btn btn-warning btn-sm shadow-sm">✏️ تعديل</a>
+                    <form action="{{ url_for('delete_user', user_id=user.id) }}" method="POST" class="d-inline"
+                          onsubmit="return confirm('هل أنت متأكد من حذف المستخدم؟');">
+                        <button type="submit" class="btn btn-danger btn-sm shadow-sm">🗑️ حذف</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<p class="text-muted text-center mt-3">لا يوجد مستخدمون</p>
+{% endif %}
+{% endblock %}
+
+{% block styles %}
+<style>
+/* ===================== ألوان البطاقات لتناسب الهيدر والفوتر ===================== */
+.user-card {
+    border-radius: 15px;
+    overflow: hidden;
+}
+
+.user-card-header {
+    background: linear-gradient(90deg, #198754, #333333);
+    color: #fff;
+    font-weight: bold;
+    padding: 10px 15px;
+    border-bottom: 1px solid rgba(255,255,255,0.2);
+    border-radius: 15px 15px 0 0;
+}
+
+.user-role-badge {
+    background-color: rgba(255, 255, 255, 0.8);
+    color: #212121;
+    font-weight: bold;
+}
+
+/* تمييز أيقونة المستخدم */
+.user-card-header span:first-child {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 1.1rem;
+}
+
+/* تأثير hover على البطاقة */
+.user-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 15px rgba(0,0,0,0.25);
+    transition: all 0.3s;
+}
+
+/* تنسيق البريد الإلكتروني */
+.card-body p strong {
+    min-width: 100px;
+    display: inline-block;
+}
+.card-body p {
+    margin-bottom: 0.5rem;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+{% endblock %}

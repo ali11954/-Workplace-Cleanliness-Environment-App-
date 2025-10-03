@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}إدارة المعايير{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4 text-center">إدارة المعايير</h2>
+
+    <!-- نموذج إضافة معيار -->
+    <form method="post" class="mb-4 p-3 border rounded bg-light shadow-sm">
+        <div class="row g-3 align-items-end">
+            <!-- اختيار المكان -->
+            <div class="col-md-2">
+                <label for="place_id" class="form-label">اختر المكان</label>
+                <select id="place_id" name="place_id" class="form-select" required>
+                    <option value="" disabled selected>اختر المكان</option>
+                    {% for location in locations %}
+                        <optgroup label="{{ location.name }}">
+                            {% for site in location.sites %}
+                                {% for place in site.places %}
+                                    <option value="{{ place.id }}">{{ location.name }} / {{ site.name }} / {{ place.name }}</option>
+                                {% endfor %}
+                            {% endfor %}
+                        </optgroup>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- اسم المعيار -->
+            <div class="col-md-2">
+                <label for="name" class="form-label">اسم المعيار</label>
+                <input type="text" name="name" id="name" class="form-control" required placeholder="اسم المعيار">
+            </div>
+
+            <!-- الحد الأدنى -->
+            <div class="col-md-2">
+                <label for="min_score" class="form-label">الحد الأدنى</label>
+                <input type="number" name="min_score" id="min_score" class="form-control" step="0.01" required placeholder="مثلاً 0">
+            </div>
+
+            <!-- الحد الأعلى -->
+            <div class="col-md-2">
+                <label for="max_score" class="form-label">الحد الأعلى</label>
+                <input type="number" name="max_score" id="max_score" class="form-control" step="0.01" required placeholder="مثلاً 10">
+            </div>
+
+            <!-- جهة المسؤولية -->
+            <div class="col-md-2">
+                <label for="authority_id" class="form-label">جهة المسؤولية</label>
+                <select id="authority_id" name="authority_id" class="form-select" required>
+                    <option value="" disabled selected>اختر الجهة</option>
+                    {% for auth in authorities %}
+                        <option value="{{ auth.id }}">{{ auth.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- نوع الإضافة -->
+            <div class="col-md-2">
+                <label for="add_type" class="form-label">نوع الإضافة</label>
+                <select id="add_type" name="add_type" class="form-select" required>
+                    <option value="single" selected>مكان واحد فقط</option>
+                    <option value="all_similar">جميع الأماكن المشابهة</option>
+                </select>
+            </div>
+
+            <!-- زر الإضافة -->
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100 shadow-sm">إضافة المعيار</button>
+            </div>
+        </div>
+    </form>
+
+    <!-- عرض المعايير -->
+    {% for location in locations %}
+        {% for site in location.sites %}
+            <div class="p-3 mb-3 rounded shadow-sm" style="background-color:#d9f2e6;">
+                <h4 class="mb-2 text-primary fw-bold">
+                    <i class="bi bi-geo-alt-fill"></i> الموقع: {{ site.name }}
+                    <span class="text-muted">(المنطقة: {{ location.name }})</span>
+                </h4>
+
+                {% for place in site.places %}
+                    <div class="p-3 mb-3 rounded shadow-sm" style="background-color:#e6f9ef;">
+                        <h5 class="mb-3 text-secondary fw-bold">
+                            <i class="bi bi-building"></i> المكان: {{ place.name }}
+                        </h5>
+
+                        {% set place_criteria = [] %}
+                        {% for c in criteria if c.place and c.place.id == place.id %}
+                            {% set _ = place_criteria.append(c) %}
+                        {% endfor %}
+
+                        {% if place_criteria %}
+                            <div class="row">
+                                {% for c in place_criteria %}
+                                    <div class="col-md-4 mb-4">
+                                        <div class="card border-0 shadow-lg h-100 rounded-3"
+                                             style="background: linear-gradient(135deg, #f0f9ff, #e0f7fa); font-family: 'Tahoma', sans-serif;">
+                                            <div class="card-body">
+                                                <h5 class="card-title text-dark fw-bold mb-3" style="font-size: 1.1rem;">
+                                                    <i class="bi bi-check-circle-fill text-primary"></i> {{ c.name }}
+                                                </h5>
+                                                <p class="card-text" style="font-size: 0.95rem; line-height: 1.6;">
+                                                    <span class="badge bg-success">الحد الأدنى: {{ c.min_score }}</span>
+                                                    <span class="badge bg-danger">الحد الأعلى: {{ c.max_score }}</span><br>
+                                                    <span class="badge bg-warning text-dark mt-2">الجهة: {{ c.authority.name if c.authority else '-' }}</span>
+                                                </p>
+                                            </div>
+                                            <div class="card-footer bg-transparent text-center">
+                                                <a href="{{ url_for('edit_criterion', criterion_id=c.id) }}" class="btn btn-sm btn-warning shadow-sm">✏ تعديل</a>
+                                                <form action="{{ url_for('delete_criterion', criterion_id=c.id) }}" method="post" style="display:inline;" onsubmit="return confirm('هل أنت متأكد من حذف هذا المعيار؟');">
+                                                    <button type="submit" class="btn btn-sm btn-danger shadow-sm">🗑 حذف</button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p class="text-danger">⚠ لا توجد معايير مضافة لهذا المكان.</p>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endfor %}
+    {% endfor %}
+</div>
+{% endblock %}

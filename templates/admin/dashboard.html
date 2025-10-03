@@ -1,0 +1,1935 @@
+{% extends "base.html" %}
+
+{% block title %}لوحة المستخدم{% endblock %}
+
+{% block content %}
+<div class="main-container">
+    <!-- الهيدر المحسن مع تأثيرات متطورة -->
+    <div class="dashboard-header">
+        <h2 class="dashboard-title">
+            🌟 تطبيق تقييم بيئة العمل والنظافة 🌟
+        </h2>
+        <p class="dashboard-subtitle">نظام متكامل لإدارة التقييمات ومتابعة الأداء</p>
+
+        <!-- شريط الحالة السريع -->
+        <div class="status-bar">
+            <div class="status-item">
+                <i class="fas fa-sync-alt"></i>
+                <span>آخر تحديث: <span id="liveTime">{{ now.strftime('%H:%M') }}</span></span>
+            </div>
+            <div class="status-item">
+                <i class="fas fa-database"></i>
+                <span>بيانات حديثة</span>
+            </div>
+            <div class="status-item">
+                <i class="fas fa-shield-alt"></i>
+                <span>النظام نشط</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================== أيقونات الواجهات العليا مع تحسينات ===================== -->
+    {% set features = [
+        {'url':'evaluations', 'icon':'fa-clipboard-check', 'text':'التقييمات', 'bg':'bg-evaluations', 'badge': total_evaluations},
+        {'url':'users', 'icon':'fa-user', 'text':'المستخدمون', 'bg':'bg-users', 'badge': users|length},
+        {'url':'authorities', 'icon':'fa-users', 'text':'الجهات', 'bg':'bg-authorities', 'badge': authorities|length},
+        {'url':'locations', 'icon':'fa-map-marker-alt', 'text':'المناطق', 'bg':'bg-locations', 'badge': total_regions},
+        {'url':'criteria', 'icon':'fa-list-check', 'text':'المعايير', 'bg':'bg-criteria', 'badge': ''},
+        {'url':'report_summary', 'icon':'fa-broom', 'text':'تقرير المناطق', 'bg':'bg-report-evaluation', 'badge': ''},
+        {'url':'reports', 'icon':'fa-file-alt', 'text':'تقرير المستخدمين', 'bg':'bg-report-general', 'badge': ''},
+        {'url':'action_plans', 'icon':'fa-tasks', 'text':'خطة عمل', 'bg':'bg-action_plans', 'badge': total_action_plans},
+        {'url':'responsibility_report', 'icon':'fa-balance-scale', 'text':'تقرير الجهات', 'bg':'bg-report-responsibility', 'badge': ''},
+        {'url':'select_user', 'icon':'fa-file-alt', 'text':'نماذج التقييم', 'bg':'bg-evaluations', 'badge': ''}
+    ] %}
+
+    <div class="features-grid">
+        {% for item in features %}
+        <a href="{{ url_for(item.url) }}" class="feature-card {{ item.bg }}" data-feature="{{ item.text }}">
+            <div class="feature-card-inner">
+                <div class="feature-icon">
+                    <i class="fas {{ item.icon }}"></i>
+                    {% if item.badge %}
+                    <span class="feature-badge">{{ item.badge }}</span>
+                    {% endif %}
+                </div>
+                <div class="feature-content">
+                    <h3>{{ item.text }}</h3>
+                    <p>إدارة {{ item.text }} في النظام</p>
+                </div>
+                <div class="feature-arrow">
+                    <i class="fas fa-arrow-left"></i>
+                </div>
+            </div>
+            <div class="feature-hover-effect"></div>
+        </a>
+        {% endfor %}
+    </div>
+
+    <!-- ===================== لوحة التحليل الذكية ===================== -->
+    <div class="analytics-dashboard">
+        <div class="analytics-header">
+            <h3><i class="fas fa-chart-network"></i> لوحة التحليل الذكية</h3>
+            <div class="analytics-controls">
+                <button class="btn-control active" data-period="today">اليوم</button>
+                <button class="btn-control" data-period="week">الأسبوع</button>
+                <button class="btn-control" data-period="month">الشهر</button>
+                <button class="btn-control" data-period="all">الكلي</button>
+            </div>
+        </div>
+
+        <!-- خيارات الرسم البياني اليومي/التراكمي والجدول الأول -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h4><i class="fas fa-user-chart"></i> أداء المستخدمين</h4>
+                        <select id="chartOption" class="form-select-sm">
+                            <option value="today">اليومي</option>
+                            <option value="total">التراكمي</option>
+                        </select>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="chartDashboard"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h4><i class="fas fa-building-chart"></i> أداء الجهات</h4>
+                        <select id="chartOptionAuth" class="form-select-sm">
+                            <option value="today">اليومي</option>
+                            <option value="total">التراكمي</option>
+                        </select>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="chartResponsibility"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- الرسم البياني للمستوى -->
+        <div class="chart-card full-width">
+            <div class="chart-header">
+                <h4><i class="fas fa-layer-group"></i> تحليل المستويات</h4>
+                <div class="chart-controls">
+                    <select id="chartOptionLevel" class="form-select-sm">
+                        <option value="today">اليومي</option>
+                        <option value="total">التراكمي</option>
+                    </select>
+                    <select id="levelType" class="form-select-sm">
+                        <option value="region" {% if level_type == 'region' %}selected{% endif %}>المناطق</option>
+                        <option value="site" {% if level_type == 'site' %}selected{% endif %}>المواقع</option>
+                        <option value="place" {% if level_type == 'place' %}selected{% endif %}>الأماكن</option>
+                    </select>
+                </div>
+            </div>
+            <div class="chart-container">
+                <canvas id="chartLevels"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================== قسم المقارنات الزمنية ===================== -->
+<div class="time-comparison-dashboard">
+    <div class="comparison-header">
+        <h3><i class="fas fa-chart-timeline"></i> تحليل الأداء الزمني</h3>
+        <p>مقارنات شاملة بين الفترات الزمنية المختلفة</p>
+    </div>
+
+    <!-- بطاقات المقارنة السريعة -->
+    <div class="comparison-cards-grid">
+        <!-- مقارنة أسبوعية -->
+        <div class="comparison-card">
+            <div class="comparison-card-header">
+                <h4><i class="fas fa-calendar-week"></i> مقارنة أسبوعية</h4>
+                <div class="comparison-badge {% if time_comparison.weekly.score_change >= 0 %}trend-up{% else %}trend-down{% endif %}">
+                    {% if time_comparison.weekly.score_change >= 0 %}+{% endif %}{{ time_comparison.weekly.score_change }}%
+                </div>
+            </div>
+            <div class="comparison-stats">
+                <div class="stat-item">
+                    <span class="stat-label">هذا الأسبوع</span>
+                    <span class="stat-value">{{ time_comparison.weekly.current.avg_score }}</span>
+                    <span class="stat-sub">متوسط النقاط</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">الأسبوع الماضي</span>
+                    <span class="stat-value">{{ time_comparison.weekly.last.avg_score }}</span>
+                    <span class="stat-sub">متوسط النقاط</span>
+                </div>
+            </div>
+            <div class="comparison-footer">
+                <div class="count-change {% if time_comparison.weekly.count_change >= 0 %}positive{% else %}negative{% endif %}">
+                    <i class="fas fa-{% if time_comparison.weekly.count_change >= 0 %}arrow-up{% else %}arrow-down{% endif %}"></i>
+                    {{ time_comparison.weekly.count_change }}% في عدد التقييمات
+                </div>
+            </div>
+        </div>
+
+        <!-- مقارنة شهرية -->
+        <div class="comparison-card">
+            <div class="comparison-card-header">
+                <h4><i class="fas fa-calendar-alt"></i> مقارنة شهرية</h4>
+                <div class="comparison-badge {% if time_comparison.monthly.score_change >= 0 %}trend-up{% else %}trend-down{% endif %}">
+                    {% if time_comparison.monthly.score_change >= 0 %}+{% endif %}{{ time_comparison.monthly.score_change }}%
+                </div>
+            </div>
+            <div class="comparison-stats">
+                <div class="stat-item">
+                    <span class="stat-label">هذا الشهر</span>
+                    <span class="stat-value">{{ time_comparison.monthly.current.avg_score }}</span>
+                    <span class="stat-sub">متوسط النقاط</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">الشهر الماضي</span>
+                    <span class="stat-value">{{ time_comparison.monthly.last.avg_score }}</span>
+                    <span class="stat-sub">متوسط النقاط</span>
+                </div>
+            </div>
+            <div class="comparison-footer">
+                <div class="count-change {% if time_comparison.monthly.count_change >= 0 %}positive{% else %}negative{% endif %}">
+                    <i class="fas fa-{% if time_comparison.monthly.count_change >= 0 %}arrow-up{% else %}arrow-down{% endif %}"></i>
+                    {{ time_comparison.monthly.count_change }}% في عدد التقييمات
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- الرسوم البيانية الزمنية -->
+    <div class="time-charts-grid">
+        <!-- اتجاه الأداء الأسبوعي -->
+        <div class="chart-container">
+            <div class="chart-header">
+                <h4><i class="fas fa-chart-line"></i> اتجاه الأداء الأسبوعي</h4>
+            </div>
+            <canvas id="weeklyTrendChart"></canvas>
+        </div>
+
+        <!-- المقارنة الشهرية -->
+        <div class="chart-container">
+            <div class="chart-header">
+                <h4><i class="fas fa-chart-bar"></i> المقارنة الشهرية</h4>
+            </div>
+            <canvas id="monthlyComparisonChart"></canvas>
+        </div>
+
+        <!-- الأداء اليومي -->
+        <div class="chart-container">
+            <div class="chart-header">
+                <h4><i class="fas fa-chart-column"></i> الأداء اليومي</h4>
+            </div>
+            <canvas id="dailyPerformanceChart"></canvas>
+        </div>
+    </div>
+
+    <!-- جدول البيانات التفصيلي -->
+    <div class="detailed-comparison">
+        <div class="comparison-section">
+            <h4><i class="fas fa-table"></i> تحليل مفصل للأداء الأسبوعي</h4>
+            <div class="table-responsive">
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>الأسبوع</th>
+                            <th>الفترة</th>
+                            <th>متوسط النقاط</th>
+                            <th>عدد التقييمات</th>
+                            <th>الحالة</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for week in weekly_trends %}
+                        <tr>
+                            <td>{{ week.week }}</td>
+                            <td>{{ week.start_date }} - {{ week.end_date }}</td>
+                            <td>{{ week.avg_score }}</td>
+                            <td>{{ week.evaluation_count }}</td>
+                            <td>
+                                <span class="performance-badge
+                                    {% if week.avg_score >= 90 %}bg-excellent
+                                    {% elif week.avg_score >= 75 %}bg-good
+                                    {% elif week.avg_score >= 60 %}bg-average
+                                    {% else %}bg-poor{% endif %}">
+                                    {% if week.avg_score >= 90 %}ممتاز
+                                    {% elif week.avg_score >= 75 %}جيد
+                                    {% elif week.avg_score >= 60 %}متوسط
+                                    {% else %}ضعيف{% endif %}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="comparison-section">
+            <h4><i class="fas fa-chart-pie"></i> تحليل الأداء الشهري</h4>
+            <div class="table-responsive">
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>الشهر</th>
+                            <th>متوسط النقاط</th>
+                            <th>عدد التقييمات</th>
+                            <th>المستخدمون النشطون</th>
+                            <th>الاتجاه</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for month in monthly_comparison %}
+                        <tr>
+                            <td>{{ month.month_name }}</td>
+                            <td>{{ month.avg_score }}</td>
+                            <td>{{ month.evaluation_count }}</td>
+                            <td>{{ month.active_users }}</td>
+                            <td>
+                                {% if loop.index > 1 %}
+    {% set prev_month = monthly_comparison[loop.index0 - 1] %}
+    {% if prev_month.avg_score > 0 %}
+        {% set change = ((month.avg_score - prev_month.avg_score) / prev_month.avg_score * 100)|round(1) %}
+        <span class="trend-indicator {% if change >= 0 %}trend-up{% else %}trend-down{% endif %}">
+            <i class="fas fa-{% if change >= 0 %}arrow-up{% else %}arrow-down{% endif %}"></i>
+            {{ change }}%
+        </span>
+    {% else %}
+        <span class="trend-indicator trend-up">
+            <i class="fas fa-arrow-up"></i>
+            جديد
+        </span>
+    {% endif %}
+{% else %}
+    <span class="trend-indicator">-</span>
+{% endif %}
+
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+    <!-- ===================== مؤشرات الأداء الذكية المحسنة ===================== -->
+    <div class="smart-kpi-dashboard">
+        <div class="kpi-header">
+            <h3><i class="fas fa-tachometer-alt"></i> مؤشرات الأداء الذكية</h3>
+            <div class="kpi-refresh">
+                <button id="refreshKPI" class="btn-refresh">
+                    <i class="fas fa-sync-alt"></i> تحديث
+                </button>
+            </div>
+        </div>
+
+        <div class="kpi-grid">
+            <!-- الصف الأول -->
+            <div class="kpi-card primary">
+                <div class="kpi-icon">
+                    <i class="fas fa-clipboard-check"></i>
+                </div>
+                <div class="kpi-content">
+                    <div class="kpi-value">{{ total_evaluations }}</div>
+                    <div class="kpi-label">إجمالي التقييمات</div>
+                    <div class="kpi-trend up">
+                        <i class="fas fa-arrow-up"></i> 12% هذا الشهر
+                    </div>
+                </div>
+            </div>
+
+            <div class="kpi-card success">
+                <div class="kpi-icon">
+                    <i class="fas fa-map-marker-alt"></i>
+                </div>
+                <div class="kpi-content">
+                    <div class="kpi-value">{{ regions_evaluated }}/{{ total_regions }}</div>
+                    <div class="kpi-label">نسبة تقييم المناطق</div>
+                    <div class="kpi-progress">
+                        <div class="progress-bar" style="width: {{ (regions_evaluated/total_regions*100)|round|int }}%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="kpi-card warning">
+                <div class="kpi-icon">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="kpi-content">
+                    <div class="kpi-value">{{ authorities_evaluated }}/{{ total_authorities }}</div>
+                    <div class="kpi-label">نسبة تقييم الجهات</div>
+                    <div class="kpi-progress">
+                        <div class="progress-bar" style="width: {{ (authorities_evaluated/total_authorities*100)|round|int }}%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="kpi-card danger">
+                <div class="kpi-icon">
+                    <i class="fas fa-star"></i>
+                </div>
+                <div class="kpi-content">
+                    <div class="kpi-value">{{ highest_score }}%</div>
+                    <div class="kpi-label">أعلى تقييم</div>
+                    <div class="kpi-badge">ممتاز</div>
+                </div>
+            </div>
+
+            <!-- الصف الثاني -->
+            <div class="kpi-card info">
+                <div class="kpi-icon">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <div class="kpi-content">
+                    <div class="kpi-value">{{ avg_score }}%</div>
+                    <div class="kpi-label">متوسط التقييم</div>
+                    <div class="kpi-comparison">
+                        <span class="comparison up">+5% عن الشهر الماضي</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="kpi-card success">
+                <div class="kpi-icon">
+                    <i class="fas fa-trophy"></i>
+                </div>
+                <div class="kpi-content">
+                    <div class="kpi-value">{{ top_regions_count }}</div>
+                    <div class="kpi-label">المناطق الأعلى أداء</div>
+                    <div class="kpi-badge">متفوق</div>
+                </div>
+            </div>
+
+            <div class="kpi-card warning">
+                <div class="kpi-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="kpi-content">
+                    <div class="kpi-value">{{ completed_authorities }}</div>
+                    <div class="kpi-label">الجهات المكتملة</div>
+                    <div class="kpi-trend up">
+                        <i class="fas fa-arrow-up"></i> 8% هذا الأسبوع
+                    </div>
+                </div>
+            </div>
+
+            <!-- الصف الثالث - الملاحظات -->
+            <div class="kpi-card secondary">
+                <div class="kpi-icon">
+                    <i class="fas fa-clipboard-list"></i>
+                </div>
+                <div class="kpi-content">
+                    <div class="kpi-value">{{ total_action_plans }}</div>
+                    <div class="kpi-label">إجمالي الملاحظات</div>
+                    <div class="kpi-detail">مفتوحة: {{ open_action_plans }}</div>
+                </div>
+            </div>
+
+            <div class="kpi-card success">
+                <div class="kpi-icon">
+                    <i class="fas fa-check"></i>
+                </div>
+                <div class="kpi-content">
+                    <div class="kpi-value">{{ closed_action_plans }}</div>
+                    <div class="kpi-label">الملاحظات المغلقة</div>
+                    <div class="kpi-progress">
+                        <div class="progress-bar" style="width: {{ close_percentage }}%"></div>
+                    </div>
+                    <div class="kpi-percentage">{{ close_percentage }}%</div>
+                </div>
+            </div>
+
+            <div class="kpi-card warning">
+                <div class="kpi-icon">
+                    <i class="fas fa-hourglass-half"></i>
+                </div>
+                <div class="kpi-content">
+                    <div class="kpi-value">{{ open_action_plans }}</div>
+                    <div class="kpi-label">الملاحظات المفتوحة</div>
+                    <div class="kpi-detail">تحت المتابعة</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== المكونات الإضافية ===================== -->
+<!-- أيقونة المعلومات -->
+<div class="floating-buttons">
+    <div class="floating-btn info-btn" onclick="toggleAppInfo()">
+        <i class="fas fa-info"></i>
+    </div>
+    <div class="floating-btn help-btn" onclick="toggleHelp()">
+        <i class="fas fa-question"></i>
+    </div>
+    <div class="floating-btn theme-btn" onclick="toggleTheme()">
+        <i class="fas fa-palette"></i>
+    </div>
+</div>
+
+<!-- نافذة معلومات التطبيق -->
+<div id="appInfoModal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>معلومات التطبيق</h3>
+            <span class="close" onclick="toggleAppInfo()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="info-grid">
+                <div class="info-item">
+                    <i class="fas fa-cube"></i>
+                    <div>
+                        <strong>اسم التطبيق:</strong>
+                        <span>نظام تقييم بيئة العمل والنظافة</span>
+                    </div>
+                </div>
+                <div class="info-item">
+                    <i class="fas fa-code-branch"></i>
+                    <div>
+                        <strong>الإصدار:</strong>
+                        <span>2.0.0</span>
+                    </div>
+                </div>
+                <div class="info-item">
+                    <i class="fas fa-user-tie"></i>
+                    <div>
+                        <strong>المصمم:</strong>
+                        <span>علي أحمد علي مبارك</span>
+                    </div>
+                </div>
+                <div class="info-item">
+                    <i class="fas fa-envelope"></i>
+                    <div>
+                        <strong>البريد:</strong>
+                        <span>alimubark440@gmail.com</span>
+                    </div>
+                </div>
+                <div class="info-item">
+                    <i class="fas fa-phone"></i>
+                    <div>
+                        <strong>الهاتف:</strong>
+                        <span>00967-(711127883 / 773014017)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة التعليمات -->
+<div id="helpModal" class="modal-overlay">
+    <div class="modal-content large">
+        <div class="modal-header">
+            <h3><i class="fas fa-book"></i> دليل استخدام التطبيق</h3>
+            <span class="close" onclick="toggleHelp()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="help-sections">
+                <div class="help-section">
+                    <h4>📊 لوحة التحكم</h4>
+                    <p>مركز التحكم الرئيسي لمتابعة جميع الأنشطة والإحصائيات</p>
+                </div>
+                <div class="help-grid">
+                    {% for item in features %}
+                    <div class="help-item">
+                        <div class="help-icon {{ item.bg }}">
+                            <i class="fas {{ item.icon }}"></i>
+                        </div>
+                        <div class="help-text">
+                            <strong>{{ item.text }}</strong>
+                            <span>إدارة {{ item.text }} في النظام</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- الإشعارات -->
+<div id="notificationCenter" class="notification-center">
+    <div class="notification-header">
+        <h4>الإشعارات</h4>
+        <button class="btn-clear" onclick="clearNotifications()">مسح الكل</button>
+    </div>
+    <div class="notification-list" id="notificationList">
+        <!-- سيتم إضافة الإشعارات ديناميكياً -->
+    </div>
+</div>
+
+<style>
+/* ===================== الأنماط المحسنة ===================== */
+:root {
+    --primary: #4A90E2;
+    --success: #4BB543;
+    --warning: #FFB74D;
+    --danger: #E53E3E;
+    --info: #4FC3F7;
+    --dark: #2D3748;
+    --light: #F8FAFC;
+    --border-radius: 16px;
+    --shadow: 0 8px 30px rgba(0,0,0,0.12);
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dashboard-header {
+    background: linear-gradient(135deg, var(--primary), #6C63FF);
+    color: white;
+    padding: 2rem;
+    border-radius: var(--border-radius);
+    margin-bottom: 2rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.dashboard-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 100%;
+    height: 100%;
+    background: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23ffffff' fill-opacity='0.1' fill-rule='evenodd'/%3E%3C/svg%3E");
+    opacity: 0.1;
+}
+
+.dashboard-title {
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+.dashboard-subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin-bottom: 1.5rem;
+}
+
+.status-bar {
+    display: flex;
+    gap: 2rem;
+    flex-wrap: wrap;
+}
+
+.status-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(255,255,255,0.2);
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    backdrop-filter: blur(10px);
+}
+
+/* شبكة الميزات المحسنة */
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 3rem;
+}
+
+.feature-card {
+    background: white;
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    text-decoration: none;
+    color: var(--dark);
+    box-shadow: var(--shadow);
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+    border: 1px solid #f0f0f0;
+}
+
+.feature-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+}
+
+.feature-card-inner {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    position: relative;
+    z-index: 2;
+}
+
+.feature-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: white;
+    position: relative;
+}
+
+.feature-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: var(--danger);
+    color: white;
+    border-radius: 10px;
+    padding: 2px 8px;
+    font-size: 0.7rem;
+    font-weight: bold;
+}
+
+.feature-content h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.feature-content p {
+    margin: 0;
+    font-size: 0.9rem;
+    opacity: 0.7;
+}
+
+.feature-arrow {
+    margin-right: auto;
+    opacity: 0;
+    transition: var(--transition);
+    color: var(--primary);
+}
+
+.feature-card:hover .feature-arrow {
+    opacity: 1;
+    transform: translateX(-5px);
+}
+
+.feature-hover-effect {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, transparent, rgba(74, 144, 226, 0.1));
+    opacity: 0;
+    transition: var(--transition);
+}
+
+.feature-card:hover .feature-hover-effect {
+    opacity: 1;
+}
+
+/* ألوان البطاقات */
+.bg-evaluations .feature-icon { background: linear-gradient(135deg, #198754, #20c997); }
+.bg-users .feature-icon { background: linear-gradient(135deg, #0dcaf0, #0d6efd); }
+.bg-authorities .feature-icon { background: linear-gradient(135deg, #ffc107, #fd7e14); }
+.bg-locations .feature-icon { background: linear-gradient(135deg, #6c757d, #343a40); }
+.bg-criteria .feature-icon { background: linear-gradient(135deg, #198754, #20c997); }
+.bg-report-evaluation .feature-icon { background: linear-gradient(135deg, #ff758c, #ff7eb3); }
+.bg-report-general .feature-icon { background: linear-gradient(135deg, #6a11cb, #2575fc); }
+.bg-action_plans .feature-icon { background: linear-gradient(135deg, #ffc107, #fd7e14); }
+.bg-report-responsibility .feature-icon { background: linear-gradient(135deg, #43e97b, #38f9d7); }
+
+/* لوحة التحليل */
+.analytics-dashboard {
+    background: white;
+    border-radius: var(--border-radius);
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--shadow);
+}
+
+.analytics-header {
+    display: flex;
+    justify-content: between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.analytics-header h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: var(--dark);
+}
+
+.analytics-controls {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-control {
+    padding: 0.5rem 1rem;
+    border: 1px solid #e2e8f0;
+    background: white;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: var(--transition);
+    font-size: 0.9rem;
+}
+
+.btn-control.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+.chart-card {
+    background: white;
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+    height: 100%;
+}
+
+.chart-card.full-width {
+    grid-column: 1 / -1;
+}
+
+.chart-header {
+    display: flex;
+    justify-content: between;
+    align-items: center;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.chart-header h4 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: var(--dark);
+}
+
+.chart-container {
+    position: relative;
+    height: 300px;
+}
+
+/* مؤشرات الأداء الذكية */
+.smart-kpi-dashboard {
+    background: white;
+    border-radius: var(--border-radius);
+    padding: 2rem;
+    box-shadow: var(--shadow);
+    margin-bottom: 2rem;
+}
+
+.kpi-header {
+    display: flex;
+    justify-content: between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.kpi-header h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: var(--dark);
+}
+
+.btn-refresh {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.btn-refresh:hover {
+    background: var(--primary-dark);
+}
+
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+}
+
+.kpi-card {
+    background: white;
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    border-left: 4px solid;
+    box-shadow: var(--shadow);
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+}
+
+.kpi-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 25px rgba(0,0,0,0.15);
+}
+
+.kpi-card.primary { border-left-color: var(--primary); }
+.kpi-card.success { border-left-color: var(--success); }
+.kpi-card.warning { border-left-color: var(--warning); }
+.kpi-card.danger { border-left-color: var(--danger); }
+.kpi-card.info { border-left-color: var(--info); }
+.kpi-card.secondary { border-left-color: #6c757d; }
+
+.kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, transparent, rgba(0,0,0,0.02));
+    opacity: 0;
+    transition: var(--transition);
+}
+
+.kpi-card:hover::before {
+    opacity: 1;
+}
+
+.kpi-card-inner {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    position: relative;
+    z-index: 2;
+}
+
+.kpi-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    color: white;
+}
+
+.kpi-card.primary .kpi-icon { background: var(--primary); }
+.kpi-card.success .kpi-icon { background: var(--success); }
+.kpi-card.warning .kpi-icon { background: var(--warning); }
+.kpi-card.danger .kpi-icon { background: var(--danger); }
+.kpi-card.info .kpi-icon { background: var(--info); }
+.kpi-card.secondary .kpi-icon { background: #6c757d; }
+
+.kpi-content {
+    flex: 1;
+}
+
+.kpi-value {
+    font-size: 2rem;
+    font-weight: 800;
+    margin-bottom: 0.25rem;
+    color: var(--dark);
+}
+
+.kpi-label {
+    font-size: 0.9rem;
+    color: #64748B;
+    margin-bottom: 0.5rem;
+}
+
+.kpi-trend, .kpi-comparison, .kpi-detail {
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.kpi-trend.up, .kpi-comparison .comparison.up {
+    color: var(--success);
+}
+
+.kpi-trend.down, .kpi-comparison .comparison.down {
+    color: var(--danger);
+}
+
+.kpi-progress {
+    background: #e2e8f0;
+    height: 6px;
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 0.5rem 0;
+}
+
+.kpi-progress .progress-bar {
+    height: 100%;
+    background: currentColor;
+    transition: width 0.3s ease;
+}
+
+.kpi-card.success .kpi-progress .progress-bar { background: var(--success); }
+.kpi-card.warning .kpi-progress .progress-bar { background: var(--warning); }
+
+.kpi-percentage {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--dark);
+}
+
+.kpi-badge {
+    background: rgba(0,0,0,0.1);
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    display: inline-block;
+}
+
+/* الأزرار العائمة */
+.floating-buttons {
+    position: fixed;
+    bottom: 2rem;
+    left: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    z-index: 1000;
+}
+
+.floating-btn {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.2rem;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+    transition: var(--transition);
+}
+
+.floating-btn:hover {
+    transform: scale(1.1);
+}
+
+.info-btn { background: var(--info); }
+.help-btn { background: var(--warning); }
+.theme-btn { background: var(--primary); }
+
+/* النوافذ المنبثقة */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 2000;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(5px);
+}
+
+.modal-content {
+    background: white;
+    border-radius: var(--border-radius);
+    padding: 2rem;
+    max-width: 500px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: var(--shadow);
+    position: relative;
+}
+
+.modal-content.large {
+    max-width: 800px;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: var(--dark);
+}
+
+.close {
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #64748B;
+    transition: var(--transition);
+}
+
+.close:hover {
+    color: var(--danger);
+}
+
+.info-grid {
+    display: grid;
+    gap: 1rem;
+}
+
+.info-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 8px;
+}
+
+.info-item i {
+    width: 40px;
+    height: 40px;
+    background: var(--primary);
+    color: white;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+}
+
+.help-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+.help-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 8px;
+    transition: var(--transition);
+}
+
+.help-item:hover {
+    background: #e2e8f0;
+}
+
+.help-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.1rem;
+}
+
+.help-text {
+    flex: 1;
+}
+
+.help-text strong {
+    display: block;
+    margin-bottom: 0.25rem;
+    color: var(--dark);
+}
+
+.help-text span {
+    font-size: 0.9rem;
+    color: #64748B;
+}
+
+/* مركز الإشعارات */
+.notification-center {
+    position: fixed;
+    top: 0;
+    right: -400px;
+    width: 380px;
+    height: 100vh;
+    background: white;
+    box-shadow: -5px 0 15px rgba(0,0,0,0.1);
+    z-index: 1500;
+    transition: var(--transition);
+    display: flex;
+    flex-direction: column;
+}
+
+.notification-center.active {
+    right: 0;
+}
+
+.notification-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: between;
+    align-items: center;
+}
+
+.notification-header h4 {
+    margin: 0;
+    color: var(--dark);
+}
+
+.btn-clear {
+    background: none;
+    border: none;
+    color: var(--danger);
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.notification-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+}
+
+/* التجاوب */
+@media (max-width: 768px) {
+    .features-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .kpi-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .analytics-header, .kpi-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .floating-buttons {
+        bottom: 1rem;
+        left: 1rem;
+    }
+
+    .modal-content {
+        margin: 1rem;
+        width: calc(100% - 2rem);
+    }
+
+    .notification-center {
+        width: 100%;
+        right: -100%;
+    }
+}
+
+/* تأثيرات الحركة */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.feature-card, .kpi-card, .chart-card {
+    animation: fadeInUp 0.6s ease-out;
+}
+
+.feature-card:nth-child(2) { animation-delay: 0.1s; }
+.feature-card:nth-child(3) { animation-delay: 0.2s; }
+.feature-card:nth-child(4) { animation-delay: 0.3s; }
+.feature-card:nth-child(5) { animation-delay: 0.4s; }
+.feature-card:nth-child(6) { animation-delay: 0.5s; }
+.feature-card:nth-child(7) { animation-delay: 0.6s; }
+.feature-card:nth-child(8) { animation-delay: 0.7s; }
+.feature-card:nth-child(9) { animation-delay: 0.8s; }
+.feature-card:nth-child(10) { animation-delay: 0.9s; }
+
+/* الوضع المظلم */
+[data-theme="dark"] {
+    --dark: #f8fafc;
+    --light: #1a202c;
+}
+
+[data-theme="dark"] .feature-card,
+[data-theme="dark"] .chart-card,
+[data-theme="dark"] .kpi-card,
+[data-theme="dark"] .analytics-dashboard,
+[data-theme="dark"] .smart-kpi-dashboard {
+    background: #2d3748;
+    color: white;
+    border-color: #4a5568;
+}
+
+[data-theme="dark"] .modal-content {
+    background: #2d3748;
+    color: white;
+}
+
+[data-theme="dark"] .info-item,
+[data-theme="dark"] .help-item {
+    background: #4a5568;
+}
+
+    /* تنسيقات الرسوم البيانية والمؤشرات */
+.comparison-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.trend-indicator {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.trend-up {
+    background: #d4edda;
+    color: #155724;
+}
+
+.trend-down {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.chart-container {
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.performance-badge {
+    font-size: 14px;
+    padding: 5px 10px;
+    border-radius: 15px;
+    font-weight: bold;
+}
+
+.bg-excellent { background: #28a745; color: white; }
+.bg-good { background: #17a2b8; color: white; }
+.bg-average { background: #ffc107; color: black; }
+.bg-poor { background: #dc3545; color: white; }
+
+/* ===================== أنماط المقارنات الزمنية ===================== */
+.time-comparison-dashboard {
+    background: white;
+    border-radius: var(--border-radius);
+    padding: 2rem;
+    box-shadow: var(--shadow);
+    margin-bottom: 2rem;
+}
+
+.comparison-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.comparison-header h3 {
+    font-size: 1.8rem;
+    color: var(--dark);
+    margin-bottom: 0.5rem;
+}
+
+.comparison-header p {
+    color: #64748B;
+    font-size: 1.1rem;
+}
+
+.comparison-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.comparison-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 15px;
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+    transition: var(--transition);
+}
+
+.comparison-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 30px rgba(0,0,0,0.2);
+}
+
+.comparison-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.comparison-card-header h4 {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.comparison-badge {
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+
+.trend-up {
+    background: rgba(255,255,255,0.3);
+    color: #4BB543;
+}
+
+.trend-down {
+    background: rgba(255,255,255,0.3);
+    color: #E53E3E;
+}
+
+.comparison-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.stat-item {
+    text-align: center;
+    padding: 1rem;
+    background: rgba(255,255,255,0.1);
+    border-radius: 10px;
+    backdrop-filter: blur(10px);
+}
+
+.stat-label {
+    display: block;
+    font-size: 0.9rem;
+    opacity: 0.8;
+    margin-bottom: 0.5rem;
+}
+
+.stat-value {
+    display: block;
+    font-size: 2rem;
+    font-weight: bold;
+    margin-bottom: 0.25rem;
+}
+
+.stat-sub {
+    font-size: 0.8rem;
+    opacity: 0.8;
+}
+
+.comparison-footer {
+    text-align: center;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255,255,255,0.2);
+}
+
+.count-change {
+    font-size: 0.9rem;
+    font-weight: bold;
+}
+
+.count-change.positive {
+    color: #4BB543;
+}
+
+.count-change.negative {
+    color: #E53E3E;
+}
+
+.time-charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.detailed-comparison {
+    background: #f8fafc;
+    border-radius: var(--border-radius);
+    padding: 2rem;
+}
+
+.comparison-section {
+    margin-bottom: 2rem;
+}
+
+.comparison-section:last-child {
+    margin-bottom: 0;
+}
+
+.comparison-section h4 {
+    color: var(--dark);
+    margin-bottom: 1rem;
+    font-size: 1.3rem;
+}
+
+.comparison-table {
+    width: 100%;
+    background: white;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.comparison-table th {
+    background: var(--primary);
+    color: white;
+    padding: 1rem;
+    text-align: right;
+    font-weight: 600;
+}
+
+.comparison-table td {
+    padding: 1rem;
+    border-bottom: 1px solid #e2e8f0;
+    text-align: right;
+}
+
+.comparison-table tr:last-child td {
+    border-bottom: none;
+}
+
+.comparison-table tr:hover {
+    background: #f8fafc;
+}
+
+/* تجاوبية */
+@media (max-width: 768px) {
+    .comparison-cards-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .time-charts-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .comparison-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .comparison-table {
+        font-size: 0.9rem;
+    }
+
+    .comparison-table th,
+    .comparison-table td {
+        padding: 0.5rem;
+    }
+}
+</style>
+
+<script>
+// ===================== JavaScript المحسن =====================
+document.addEventListener('DOMContentLoaded', function() {
+    // تحديث الوقت الحي
+    function updateLiveTime() {
+        const now = new Date();
+        const timeString = now.toLocaleTimeString('ar-SA');
+        document.getElementById('liveTime').textContent = timeString;
+    }
+    setInterval(updateLiveTime, 1000);
+    updateLiveTime();
+
+    // تحميل البيانات الحية
+    function loadLiveData() {
+        fetch('/api/dashboard-data')
+            .then(response => response.json())
+            .then(data => {
+                updateKPIs(data);
+                updateCharts(data);
+                showNotification('تم تحديث البيانات بنجاح', 'success');
+            })
+            .catch(error => {
+                console.error('Error loading live data:', error);
+                showNotification('فشل في تحديث البيانات', 'error');
+            });
+    }
+
+    // تحديث مؤشرات الأداء
+    function updateKPIs(data) {
+        // سيتم تحديث القيم ديناميكياً
+        document.querySelectorAll('.kpi-value').forEach((element, index) => {
+            // تأثير التحديث
+            element.style.transform = 'scale(1.1)';
+            setTimeout(() => {
+                element.style.transform = 'scale(1)';
+            }, 300);
+        });
+    }
+
+    // إشعارات النظام
+    function showNotification(message, type = 'info') {
+        const notificationList = document.getElementById('notificationList');
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        notification.innerHTML = `
+            <div class="notification-icon">
+                <i class="fas fa-${type === 'success' ? 'check' : type === 'error' ? 'exclamation' : 'info'}"></i>
+            </div>
+            <div class="notification-content">
+                <p>${message}</p>
+                <small>${new Date().toLocaleTimeString('ar-SA')}</small>
+            </div>
+            <button class="notification-close" onclick="this.parentElement.remove()">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        notificationList.insertBefore(notification, notificationList.firstChild);
+
+        // إشعار صوتي
+        if (type === 'success') {
+            new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA').play();
+        }
+    }
+
+    // تبديل الوضع المظلم
+    function toggleTheme() {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+        showNotification(`تم تفعيل الوضع ${newTheme === 'dark' ? 'المظلم' : 'الفاتح'}`, 'success');
+    }
+
+    // التحكم في فترات البيانات
+    document.querySelectorAll('.btn-control').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.btn-control').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            loadPeriodData(this.dataset.period);
+        });
+    });
+
+    // تحديث البيانات حسب الفترة
+    function loadPeriodData(period) {
+        showNotification(`جاري تحميل بيانات ${period}...`, 'info');
+        // سيتم تحميل البيانات حسب الفترة المحددة
+    }
+
+    // تفعيل تحديث KPI
+    document.getElementById('refreshKPI').addEventListener('click', loadLiveData);
+
+    // تحميل البيانات كل 5 دقائق
+    setInterval(loadLiveData, 5 * 60 * 1000);
+
+    // تأثيرات إضافية للبطاقات
+    document.querySelectorAll('.feature-card').forEach(card => {
+        card.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-8px) scale(1.02)';
+        });
+
+        card.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(-5px) scale(1)';
+        });
+    });
+
+    // تحميل الوضع المحفوظ
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+
+    // إضافة بعض الإشعارات الافتراضية
+    setTimeout(() => {
+        showNotification('مرحباً بك في لوحة التحكم!', 'info');
+        showNotification('تم تحميل جميع البيانات بنجاح', 'success');
+    }, 1000);
+});
+
+// وظائف النوافذ المنبثقة
+function toggleAppInfo() {
+    const modal = document.getElementById('appInfoModal');
+    modal.style.display = modal.style.display === 'flex' ? 'none' : 'flex';
+}
+
+function toggleHelp() {
+    const modal = document.getElementById('helpModal');
+    modal.style.display = modal.style.display === 'flex' ? 'none' : 'flex';
+}
+
+function clearNotifications() {
+    document.getElementById('notificationList').innerHTML = '';
+    showNotification('تم مسح جميع الإشعارات', 'success');
+}
+
+// إغلاق النوافذ بالضغط خارجها
+window.addEventListener('click', function(event) {
+    const appInfoModal = document.getElementById('appInfoModal');
+    const helpModal = document.getElementById('helpModal');
+
+    if (event.target === appInfoModal) {
+        toggleAppInfo();
+    }
+
+    if (event.target === helpModal) {
+        toggleHelp();
+    }
+});
+
+// إغلاق النوافذ بالزر ESC
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        toggleAppInfo();
+        toggleHelp();
+    }
+});
+</script>
+
+<!-- الرسوم البيانية (نفس الكود السابق) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// =================== الرسم البياني العام ===================
+const users = {{ users|tojson }};
+const labels = users.map(u => u.fullname);
+const todayData = users.map(u => u.today_percent);
+const totalData = users.map(u => u.total_percent);
+const colors = users.map(u => u.color || 'rgba(100,149,237,0.6)');
+
+const ctx = document.getElementById('chartDashboard').getContext('2d');
+let currentDataset = todayData;
+
+const chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: labels,
+        datasets: [{
+            label: 'النسبة (%)',
+            data: currentDataset,
+            backgroundColor: colors.map(c => c.replace('0.6','0.3')),
+            borderColor: colors.map(c => c.replace('0.6','1')),
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4,
+            pointRadius: 6,
+            pointHoverRadius: 8
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        const user = users[context.dataIndex];
+                        return ` ${user.fullname}: ${context.raw}% (${currentDataset === todayData ? user.today_evaluated : user.total_evaluated}/${user.total_criteria})`;
+                    }
+                }
+            },
+            title: {
+                display: true,
+                text: 'نسبة التقييم لكل المستخدمين',
+                font: { size: 16, weight: 'bold' },
+                color: '#333'
+            },
+            legend: { display: false }
+        },
+        scales: {
+            y: { beginAtZero:true, max:100, ticks:{stepSize:10}, title:{display:true, text:'النسبة (%)'} },
+            x: { title:{display:true, text:'المستخدمون'} }
+        }
+    }
+});
+
+document.getElementById('chartOption').addEventListener('change', function() {
+    currentDataset = this.value === 'today' ? todayData : totalData;
+    chart.data.datasets[0].data = currentDataset;
+    chart.update();
+});
+
+// =================== الرسم البياني للجهات ===================
+const authorities = {{ authorities|tojson }};
+const labelsAuth = authorities.map(a => a.authority);
+const todayDataAuth = authorities.map(a => a.today_percent);
+const totalDataAuth = authorities.map(a => a.total_percent);
+const colorsAuth = authorities.map((a,i) => `hsla(${i*40},70%,60%,0.6)`);
+
+const ctxAuth = document.getElementById('chartResponsibility').getContext('2d');
+let currentDatasetAuth = todayDataAuth;
+
+const chartAuth = new Chart(ctxAuth, {
+    type: 'bar',
+    data: {
+        labels: labelsAuth,
+        datasets: [{
+            label: 'النسبة (%)',
+            data: currentDatasetAuth,
+            backgroundColor: colorsAuth.map(c => c.replace('0.6','0.3')),
+            borderColor: colorsAuth.map(c => c.replace('0.6','1')),
+            borderWidth: 2
+        }]
+    },
+    options: {
+        responsive:true,
+        maintainAspectRatio: false,
+        plugins:{
+            tooltip:{
+                callbacks:{
+                    label:function(context){
+                        const auth = authorities[context.dataIndex];
+                        return ` ${auth.authority}: ${context.raw}% (${currentDatasetAuth === todayDataAuth ? auth.today_evaluated : auth.total_evaluated}/${auth.total_criteria})`;
+                    }
+                }
+            },
+            title:{ display:true, text:'مؤشر الأداء حسب جهات المسؤولية', font:{size:16, weight:'bold'}, color:'#333' },
+            legend:{display:false}
+        },
+        scales:{ y:{beginAtZero:true,max:100, ticks:{stepSize:10}, title:{display:true,text:'النسبة (%)'} }, x:{title:{display:true,text:'جهات المسؤولية'}} }
+    }
+});
+
+document.getElementById('chartOptionAuth').addEventListener('change', function() {
+    currentDatasetAuth = this.value === 'today' ? todayDataAuth : totalDataAuth;
+    chartAuth.data.datasets[0].data = currentDatasetAuth;
+    chartAuth.update();
+});
+
+// =================== الرسم البياني للمستوى ===================
+const levelData = {{ level_data|tojson }};
+if(levelData.length>0){
+    const ctxLevel = document.getElementById('chartLevels').getContext('2d');
+    let currentDatasetLevel = levelData.map(l=>l.today_percent);
+    const colorsLevel = levelData.map((l,i)=>`hsla(${i*40},70%,60%,0.6)`);
+
+    const chartLevels = new Chart(ctxLevel, {
+        type:'bar',
+        data:{
+            labels: levelData.map(l=>l.level),
+            datasets:[{
+                label:'النسبة (%)',
+                data: currentDatasetLevel,
+                backgroundColor: colorsLevel.map(c=>c.replace('0.6','0.3')),
+                borderColor: colorsLevel.map(c=>c.replace('0.6','1')),
+                borderWidth:2
+            }]
+        },
+        options:{
+            responsive:true,
+            maintainAspectRatio:false,
+            plugins:{
+                tooltip:{callbacks:{
+                    label:function(ctx){
+                        const lvl=levelData[ctx.dataIndex];
+                        return `${lvl.level}: ${ctx.raw}% (${lvl.today_evaluated}/${lvl.total_criteria})`;
+                    }
+                }},
+                title:{display:true,text:'مؤشر الأداء'},
+                legend:{display:false}
+            },
+            scales:{ y:{beginAtZero:true,max:100} }
+        }
+    });
+
+    // تغيير اليومي/التراكمي
+    document.getElementById('chartOptionLevel').addEventListener('change', function(){
+        const value = this.value;
+        chartLevels.data.datasets[0].data = levelData.map(l=>value=='today'?l.today_percent:l.total_percent);
+        chartLevels.update();
+    });
+
+    // تغيير المستوى: المناطق/المواقع/الأماكن
+    document.getElementById('levelType').addEventListener('change', function(){
+        const value = this.value;
+        window.location.href = `?level=${value}`;
+    });
+}
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// رسم الرسوم البيانية للمقارنات الزمنية
+function renderTimeCharts() {
+    // رسم بياني للأداء الأسبوعي
+    const weeklyCtx = document.getElementById('weeklyTrendChart');
+    if (weeklyCtx) {
+        new Chart(weeklyCtx, {
+            type: 'line',
+            data: {
+                labels: {{ weekly_trends|map(attribute='week')|list|tojson }},
+                datasets: [{
+                    label: 'متوسط النقاط',
+                    data: {{ weekly_trends|map(attribute='avg_score')|list|tojson }},
+                    borderColor: '#007bff',
+                    backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'اتجاه الأداء الأسبوعي'
+                    }
+                }
+            }
+        });
+    }
+
+    // رسم بياني للمقارنة الشهرية
+    const monthlyCtx = document.getElementById('monthlyComparisonChart');
+    if (monthlyCtx) {
+        new Chart(monthlyCtx, {
+            type: 'bar',
+            data: {
+                labels: {{ monthly_comparison|map(attribute='month_name')|list|tojson }},
+                datasets: [{
+                    label: 'عدد التقييمات',
+                    data: {{ monthly_comparison|map(attribute='evaluation_count')|list|tojson }},
+                    backgroundColor: 'rgba(40, 167, 69, 0.8)'
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'المقارنة الشهرية - عدد التقييمات'
+                    }
+                }
+            }
+        });
+    }
+
+    // رسم بياني للأداء اليومي
+    const dailyCtx = document.getElementById('dailyPerformanceChart');
+    if (dailyCtx) {
+        new Chart(dailyCtx, {
+            type: 'bar',
+            data: {
+                labels: {{ daily_performance|map(attribute='date_short')|list|tojson }},
+                datasets: [{
+                    label: 'متوسط النقاط',
+                    data: {{ daily_performance|map(attribute='avg_score')|list|tojson }},
+                    backgroundColor: 'rgba(255, 193, 7, 0.8)',
+                    borderColor: 'rgba(255, 193, 7, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'الأداء اليومي - متوسط النقاط'
+                    }
+                }
+            }
+        });
+    }
+}
+
+// تشغيل الرسوم البيانية عند تحميل الصفحة
+document.addEventListener('DOMContentLoaded', renderTimeCharts);
+</script>
+{% endblock %}
