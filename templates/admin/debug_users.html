@@ -1,0 +1,37 @@
+<!-- templates/admin/debug_users.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2>معلومات تصحيح الأخطاء - المستخدمين</h2>
+
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>اسم المستخدم</th>
+                <th>الدور</th>
+                <th>شركة ID</th>
+                <th>اسم الشركة</th>
+                <th>مسؤول؟</th>
+                <th>نشط؟</th>
+                <th>عدد الصلاحيات</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users_debug %}
+            <tr>
+                <td>{{ user.id }}</td>
+                <td>{{ user.username }}</td>
+                <td>{{ user.role }}</td>
+                <td>{{ user.company_id }}</td>
+                <td>{{ user.company_name }}</td>
+                <td>{{ user.is_admin }}</td>
+                <td>{{ user.active }}</td>
+                <td>{{ user.permissions_count }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

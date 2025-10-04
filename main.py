@@ -11,10 +11,11 @@ from wtforms.validators import DataRequired, Length, NumberRange, EqualTo, Optio
 from datetime import datetime
 from collections import defaultdict
 import io
-from wtforms import StringField, SelectField, FloatField, SubmitField
-from flask_wtf import FlaskForm
-from wtforms import StringField, SelectField, SubmitField
-from wtforms.validators import DataRequired
+from functools import wraps
+from flask import redirect, url_for, flash
+from flask_login import current_user
+from sqlalchemy import func, distinct
+from wtforms import   FloatField
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
@@ -24,12 +25,11 @@ from reportlab.pdfbase import pdfmetrics
 import arabic_reshaper
 from bidi.algorithm import get_display
 import os
-from flask import render_template, request, redirect, url_for, flash, jsonify
-from flask_login import login_required, current_user
+from flask import  jsonify
 from flask_migrate import Migrate
 from flask import jsonify
 from flask_wtf import FlaskForm
-from wtforms import StringField, IntegerField, SubmitField
+from wtforms import  IntegerField, SubmitField
 from wtforms.validators import DataRequired, NumberRange
 from flask_wtf import FlaskForm
 from wtforms import SelectField, TextAreaField, SubmitField
@@ -45,7 +45,7 @@ from flask_sqlalchemy import SQLAlchemy
 from models import db  # أو من مكانك الصحيح حسب مشروعك
 from models import User
 # في الأعلى مع بقية الاستدعاءات
-from models import EvaluationAuthority
+from models import EvaluationAuthority,Company,UserPermission,Permission
 
 
 
@@ -128,7 +128,47 @@ else:
     def get_id(self):
         return str(self.id)
 
+def permission_required(permission):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            # تحقق من أن المستخدم لديه خاصية has_permission
+            if not hasattr(current_user, 'has_permission') or not current_user.has_permission(permission):
+                flash("لا تملك الصلاحية المطلوبة.", "danger")
+                return redirect(url_for("dashboard"))
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+from functools import wraps
+from flask import redirect, url_for, flash
+from flask_login import current_user
+
+def company_access_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # مثال: تحقق أن المستخدم مرتبط بشركة
+        if not hasattr(current_user, 'company_id') or current_user.company_id is None:
+            flash("لا تملك صلاحية الوصول إلى هذه الشركة.", "danger")
+            return redirect(url_for("dashboard"))
+        return f(*args, **kwargs)
+    return decorated_function
+# تحقق من إدارة المستخدمين
+def user_management_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not getattr(current_user, 'role', None) in ['admin', 'supervisor']:
+            flash("ليس لديك صلاحية إدارة المستخدمين.", "danger")
+            return redirect(url_for('dashboard'))
+        return f(*args, **kwargs)
+    return decorated_function
+
 # ====== FORMS ======
+class CompanyForm(FlaskForm):
+    name = StringField('اسم الشركة', validators=[DataRequired(), Length(min=2, max=150)])
+    code = StringField('كود الشركة', validators=[Optional(), Length(max=50)])
+    active = SelectField('نشطة', choices=[('1', 'نعم'), ('0', 'لا')], default='1')
+    submit = SubmitField('حفظ')
 
 class LoginForm(FlaskForm):
     username = StringField('اسم المستخدم', validators=[DataRequired()])
@@ -136,29 +176,28 @@ class LoginForm(FlaskForm):
     submit = SubmitField('تسجيل الدخول')
 
 from wtforms import SelectMultipleField
-
 class UserForm(FlaskForm):
     fullname = StringField('الاسم الكامل', validators=[DataRequired(), Length(min=3, max=150)])
     username = StringField('اسم المستخدم', validators=[DataRequired(), Length(min=3, max=80)])
     email = StringField('البريد الإلكتروني', validators=[DataRequired(), Length(max=120)])
     password = PasswordField('كلمة المرور', validators=[Optional(), Length(min=6)])
-    password_confirm = PasswordField('تأكيد كلمة المرور', validators=[EqualTo('password', message='كلمتا المرور غير متطابقتين')])
-    role = SelectField('الدور', choices=[('admin', 'مشرف'), ('user', 'مستخدم')], default='user')
+    password_confirm = PasswordField('تأكيد كلمة المرور',
+                                   validators=[EqualTo('password', message='كلمتا المرور غير متطابقتين')])
+    role = SelectField('الدور', choices=[('admin', 'مشرف'), ('supervisor', 'مشرف فرعي'), ('user', 'مستخدم')], default='user')
+    company_id = SelectField('الشركة', coerce=int, validators=[DataRequired()])
     active = SelectField('نشط', choices=[('1', 'نعم'), ('0', 'لا')], default='1')
-
-    # تعديل هذا الحقل ليكون متعدد
-    region_ids = SelectMultipleField('اختر المناطق', coerce=int, validators=[DataRequired()])
-
+    region_ids = SelectMultipleField('المناطق المسؤول عنها', coerce=int, validators=[DataRequired()])
     submit = SubmitField('حفظ')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # جلب الشركات للمشرف العام فقط
         from flask import current_app
         with current_app.app_context():
+            from models import Company
+            self.company_id.choices = [(c.id, c.name) for c in Company.query.order_by(Company.name).all()]
             self.region_ids.choices = [(r.id, r.name) for r in Location.query.order_by(Location.name).all()]
-        # ضمان أن data ليست None
-        if self.region_ids.data is None:
-            self.region_ids.data = []
+
 
 from flask_wtf import FlaskForm
 from wtforms import StringField, SubmitField
@@ -170,6 +209,8 @@ class EvaluationAuthorityForm(FlaskForm):
 
 class RegionForm(FlaskForm):
     name = StringField('اسم المنطقة', validators=[DataRequired()])
+    company_id = SelectField('Company', coerce=int, validators=[DataRequired()])
+
     submit = SubmitField('إضافة منطقة')
 
 class SiteForm(FlaskForm):
@@ -263,207 +304,309 @@ def dashboard():
     today = date.today()
     now = datetime.now()
 
-    # ===== إحصاءات عامة =====
-    total_evaluations = Evaluation.query.count()
-    total_regions = Location.query.count()
-    regions_evaluated = db.session.query(Evaluation.region_id).distinct().count()
-    total_authorities = EvaluationAuthority.query.count()
-    authorities_evaluated = db.session.query(EvaluationDetail.authority_id).distinct().count()
-    users = User.query.filter(User.role != 'admin', User.active == True).all()
+    # الحصول على الشركة المختارة من البارامتر أو استخدام الشركة الافتراضية للمستخدم
+    selected_company_id = request.args.get('company_id', type=int)
 
-    highest_score = db.session.query(func.max(EvaluationDetail.score)).scalar() or 0
-    avg_score = round(db.session.query(func.avg(EvaluationDetail.score)).scalar() or 0, 1)
-
-    # ===== الملاحظات =====
-    total_action_plans = db.session.query(EvaluationDetail).filter(
-        EvaluationDetail.note.isnot(None), EvaluationDetail.note != ''
-    ).count()
-    closed_action_plans = db.session.query(ActionPlan).filter(ActionPlan.closed == True).count()
-    open_action_plans = total_action_plans - closed_action_plans
-    close_percentage = round((closed_action_plans / total_action_plans) * 100, 1) if total_action_plans else 0
-
-    top_regions_count = db.session.query(Evaluation.region_id) \
-        .join(EvaluationDetail, Evaluation.id == EvaluationDetail.evaluation_id) \
-        .group_by(Evaluation.region_id) \
-        .having(func.avg(EvaluationDetail.score) >= 90).count()
-
-    completed_authorities = db.session.query(EvaluationDetail.authority_id) \
-        .group_by(EvaluationDetail.authority_id).count()
-
-    # ===== بيانات المقارنات الزمنية =====
-    time_comparison_data = get_time_comparison_data()
-
-    # ===== بيانات الرسوم البيانية الزمنية =====
-    weekly_trends = get_weekly_trends()
-    monthly_comparison = get_monthly_comparison()
-    daily_performance = get_daily_performance()
-
-    # ===== بيانات المستخدمين (الكود الحالي) =====
-    dashboard_users = []
-    colors = ["#FFCDD2", "#C8E6C9", "#BBDEFB", "#FFF9C4", "#D1C4E9", "#B2DFDB", "#FFE0B2", "#F8BBD0"]
-    color_index = 0
-
-    for user in users:
-        # ... كود المستخدمين الحالي بدون تغيير ...
-        total_criteria = db.session.query(Criterion.id) \
-            .join(Place).join(Site) \
-            .filter(Site.region_id == user.region_id).count()
-
-        today_evaluated = db.session.query(EvaluationDetail.id) \
-            .join(Evaluation, Evaluation.id == EvaluationDetail.evaluation_id) \
-            .filter(Evaluation.user_id == user.id, func.date(Evaluation.date) == today).count()
-
-        today_percent = round((today_evaluated / total_criteria) * 100, 1) if total_criteria else 0
-        today_percent = min(today_percent, 100)
-
-        total_evaluated = db.session.query(EvaluationDetail.id) \
-            .join(Evaluation, Evaluation.id == EvaluationDetail.evaluation_id) \
-            .filter(Evaluation.user_id == user.id).count()
-
-        first_eval_date = db.session.query(func.min(Evaluation.date)) \
-            .filter(Evaluation.user_id == user.id).scalar()
-
-        if first_eval_date:
-            days_count = (today - first_eval_date.date()).days + 1
-            total_criteria_all_period = total_criteria * days_count
+    if current_user.role == 'admin':
+        # للمشرف: يمكنه اختيار أي شركة
+        if selected_company_id:
+            current_company_id = selected_company_id
         else:
-            total_criteria_all_period = 0
+            # إذا لم يتم اختيار شركة، استخدم أول شركة نشطة
+            first_company = Company.query.filter_by(active=True).first()
+            current_company_id = first_company.id if first_company else None
+    else:
+        # للمستخدم العادي: يستخدم فقط شركته
+        current_company_id = current_user.company_id
 
-        total_percent = round((total_evaluated / total_criteria_all_period) * 100,
-                              1) if total_criteria_all_period else 0
-        total_percent = min(total_percent, 100)
+    # جلب قائمة الشركات للفلتر (للمشرف فقط)
+    companies_list = []
+    if current_user.role == 'admin':
+        companies_list = Company.query.filter_by(active=True).order_by(Company.name).all()
 
-        user_color = colors[color_index % len(colors)]
-        color_index += 1
+    # إحصائيات حسب الشركة المختارة
+    if current_company_id:
+        companies_stats = get_companies_statistics(current_company_id)
+        total_evaluations = Evaluation.query.join(User).filter(User.company_id == current_company_id).count()
+        total_companies = 1
 
-        dashboard_users.append({
-            "id": user.id,
-            "fullname": user.fullname,
-            "today_percent": today_percent,
-            "total_percent": total_percent,
-            "today_evaluated": today_evaluated,
-            "total_evaluated": total_evaluated,
-            "total_criteria": total_criteria,
-            "color": user_color
-        })
+        # بيانات الرسوم البيانية حسب الشركة
+        daily_stats = get_daily_evaluations_stats(current_company_id)
+        cumulative_stats = get_cumulative_evaluations_stats(current_company_id)
 
-    # ===== بيانات جهات المسؤولية (الكود الحالي) =====
-    authorities = EvaluationAuthority.query.all()
-    chart_data = []
+        # إحصائيات عامة حسب الشركة
+        total_regions = Location.query.filter_by(company_id=current_company_id).count()
+        regions_evaluated = db.session.query(Evaluation.region_id) \
+            .join(User).filter(User.company_id == current_company_id).distinct().count()
 
-    for auth in authorities:
-        # ... كود جهات المسؤولية الحالي بدون تغيير ...
-        total_criteria = db.session.query(func.count(Criterion.id)) \
-                             .filter(Criterion.authority_id == auth.id).scalar() or 0
+        total_authorities = EvaluationAuthority.query.filter_by(company_id=current_company_id).count()
+        authorities_evaluated = db.session.query(EvaluationDetail.authority_id) \
+            .join(Evaluation).join(User) \
+            .filter(User.company_id == current_company_id).distinct().count()
 
-        today_eval = db.session.query(
-            func.sum(EvaluationDetail.score).label("score_sum"),
-            func.sum(Criterion.max_score).label("max_sum"),
-            func.count(EvaluationDetail.id)
-        ).join(Criterion, EvaluationDetail.criterion_id == Criterion.id) \
-            .join(Evaluation, EvaluationDetail.evaluation_id == Evaluation.id) \
-            .filter(Criterion.authority_id == auth.id, func.date(Evaluation.date) == today).first()
+        users = User.query.filter(
+            User.role != 'admin',
+            User.active == True,
+            User.company_id == current_company_id
+        ).all()
 
-        today_score = today_eval.score_sum or 0
-        today_max = today_eval.max_sum or 0
-        today_count = today_eval[2] or 0
-        today_percent = round((today_score / today_max * 100), 1) if today_max else 0
+        highest_score = db.session.query(func.max(EvaluationDetail.score)) \
+                            .join(Evaluation).join(User) \
+                            .filter(User.company_id == current_company_id).scalar() or 0
 
-        total_eval = db.session.query(
-            func.sum(EvaluationDetail.score).label("score_sum"),
-            func.sum(Criterion.max_score).label("max_sum"),
-            func.count(EvaluationDetail.id)
-        ).join(Criterion, EvaluationDetail.criterion_id == Criterion.id) \
-            .join(Evaluation, EvaluationDetail.evaluation_id == Evaluation.id) \
-            .filter(Criterion.authority_id == auth.id).first()
+        avg_score = round(db.session.query(func.avg(EvaluationDetail.score)) \
+                          .join(Evaluation).join(User) \
+                          .filter(User.company_id == current_company_id).scalar() or 0, 1)
 
-        total_score = total_eval.score_sum or 0
-        total_max = total_eval.max_sum or 0
-        total_count = total_eval[2] or 0
-        total_percent = round((total_score / total_max * 100), 1) if total_max else 0
+        # الملاحظات حسب الشركة
+        total_action_plans = db.session.query(EvaluationDetail) \
+            .join(Evaluation).join(User) \
+            .filter(
+            User.company_id == current_company_id,
+            EvaluationDetail.note.isnot(None),
+            EvaluationDetail.note != ''
+        ).count()
 
-        chart_data.append({
-            "authority": auth.name,
-            "today_percent": today_percent,
-            "total_percent": total_percent,
-            "today_evaluated": today_count,
-            "total_evaluated": total_count,
-            "total_criteria": total_criteria
-        })
+        closed_action_plans = db.session.query(ActionPlan) \
+            .join(EvaluationDetail).join(Evaluation).join(User) \
+            .filter(
+            User.company_id == current_company_id,
+            ActionPlan.closed == True
+        ).count()
 
-    # ===== تحديد نوع المستوى (الكود الحالي) =====
-    level_type = request.args.get('level', 'region')
+        open_action_plans = total_action_plans - closed_action_plans
+        close_percentage = round((closed_action_plans / total_action_plans) * 100, 1) if total_action_plans else 0
 
-    # ===== جمع البيانات حسب النوع (الكود الحالي) =====
-    if level_type == 'region':
-        levels = Location.query.all()
-    elif level_type == 'site':
-        levels = Site.query.all()
-    elif level_type == 'place':
-        levels = (
-            db.session.query(Place.name, func.min(Place.id).label("id"))
-            .group_by(Place.name)
-            .all()
-        )
+        top_regions_count = db.session.query(Evaluation.region_id) \
+            .join(EvaluationDetail, Evaluation.id == EvaluationDetail.evaluation_id) \
+            .join(User).filter(User.company_id == current_company_id) \
+            .group_by(Evaluation.region_id) \
+            .having(func.avg(EvaluationDetail.score) >= 90).count()
 
-    level_data = []
+        completed_authorities = db.session.query(EvaluationDetail.authority_id) \
+            .join(Evaluation).join(User) \
+            .filter(User.company_id == current_company_id) \
+            .group_by(EvaluationDetail.authority_id).count()
 
-    for lvl in levels:
-        # ... كود المستويات الحالي بدون تغيير ...
+        # بيانات المقارنات الزمنية حسب الشركة
+        time_comparison_data = get_time_comparison_data(current_company_id)
+        weekly_trends = get_weekly_trends(current_company_id)
+        monthly_comparison = get_monthly_comparison(current_company_id)
+        daily_performance = get_daily_performance(current_company_id)
+
+        # بيانات المستخدمين حسب الشركة
+        dashboard_users = []
+        colors = ["#FFCDD2", "#C8E6C9", "#BBDEFB", "#FFF9C4", "#D1C4E9", "#B2DFDB", "#FFE0B2", "#F8BBD0"]
+        color_index = 0
+
+        for user in users:
+            total_criteria = db.session.query(Criterion.id) \
+                .join(Place).join(Site).join(Location) \
+                .filter(Location.company_id == current_company_id).count()
+
+            today_evaluated = db.session.query(EvaluationDetail.id) \
+                .join(Evaluation, Evaluation.id == EvaluationDetail.evaluation_id) \
+                .filter(
+                Evaluation.user_id == user.id,
+                func.date(Evaluation.date) == today,
+                User.company_id == current_company_id
+            ).count()
+
+            today_percent = round((today_evaluated / total_criteria) * 100, 1) if total_criteria else 0
+            today_percent = min(today_percent, 100)
+
+            total_evaluated = db.session.query(EvaluationDetail.id) \
+                .join(Evaluation, Evaluation.id == EvaluationDetail.evaluation_id) \
+                .filter(
+                Evaluation.user_id == user.id,
+                User.company_id == current_company_id
+            ).count()
+
+            first_eval_date = db.session.query(func.min(Evaluation.date)) \
+                .filter(
+                Evaluation.user_id == user.id,
+                User.company_id == current_company_id
+            ).scalar()
+
+            if first_eval_date:
+                days_count = (today - first_eval_date.date()).days + 1
+                total_criteria_all_period = total_criteria * days_count
+            else:
+                total_criteria_all_period = 0
+
+            total_percent = round((total_evaluated / total_criteria_all_period) * 100,
+                                  1) if total_criteria_all_period else 0
+            total_percent = min(total_percent, 100)
+
+            user_color = colors[color_index % len(colors)]
+            color_index += 1
+
+            dashboard_users.append({
+                "id": user.id,
+                "fullname": user.fullname,
+                "today_percent": today_percent,
+                "total_percent": total_percent,
+                "today_evaluated": today_evaluated,
+                "total_evaluated": total_evaluated,
+                "total_criteria": total_criteria,
+                "color": user_color
+            })
+
+        # بيانات جهات المسؤولية حسب الشركة
+        authorities = EvaluationAuthority.query.filter_by(company_id=current_company_id).all()
+        chart_data = []
+
+        for auth in authorities:
+            total_criteria = db.session.query(func.count(Criterion.id)) \
+                                 .filter(Criterion.authority_id == auth.id).scalar() or 0
+
+            today_eval = db.session.query(
+                func.sum(EvaluationDetail.score).label("score_sum"),
+                func.sum(Criterion.max_score).label("max_sum"),
+                func.count(EvaluationDetail.id)
+            ).join(Criterion, EvaluationDetail.criterion_id == Criterion.id) \
+                .join(Evaluation, EvaluationDetail.evaluation_id == Evaluation.id) \
+                .join(User).filter(User.company_id == current_company_id) \
+                .filter(Criterion.authority_id == auth.id, func.date(Evaluation.date) == today).first()
+
+            today_score = today_eval.score_sum or 0
+            today_max = today_eval.max_sum or 0
+            today_count = today_eval[2] or 0
+            today_percent = round((today_score / today_max * 100), 1) if today_max else 0
+
+            total_eval = db.session.query(
+                func.sum(EvaluationDetail.score).label("score_sum"),
+                func.sum(Criterion.max_score).label("max_sum"),
+                func.count(EvaluationDetail.id)
+            ).join(Criterion, EvaluationDetail.criterion_id == Criterion.id) \
+                .join(Evaluation, EvaluationDetail.evaluation_id == Evaluation.id) \
+                .join(User).filter(User.company_id == current_company_id) \
+                .filter(Criterion.authority_id == auth.id).first()
+
+            total_score = total_eval.score_sum or 0
+            total_max = total_eval.max_sum or 0
+            total_count = total_eval[2] or 0
+            total_percent = round((total_score / total_max * 100), 1) if total_max else 0
+
+            chart_data.append({
+                "authority": auth.name,
+                "today_percent": today_percent,
+                "total_percent": total_percent,
+                "today_evaluated": today_count,
+                "total_evaluated": total_count,
+                "total_criteria": total_criteria
+            })
+
+        # بيانات المستويات حسب الشركة
+        level_type = request.args.get('level', 'region')
+
         if level_type == 'region':
-            filter_condition = Site.region_id == lvl.id
-            level_name = lvl.name
+            levels = Location.query.filter_by(company_id=current_company_id).all()
         elif level_type == 'site':
-            filter_condition = Place.site_id == lvl.id
-            level_name = lvl.name
-        else:  # place
-            filter_condition = Place.name == lvl.name
-            level_name = lvl.name
+            levels = Site.query.join(Location).filter(Location.company_id == current_company_id).all()
+        elif level_type == 'place':
+            levels = (
+                db.session.query(Place.name, func.min(Place.id).label("id"))
+                .join(Site).join(Location)
+                .filter(Location.company_id == current_company_id)
+                .group_by(Place.name)
+                .all()
+            )
 
-        total_criteria = db.session.query(func.count(Criterion.id)) \
-                             .filter(filter_condition).scalar() or 0
+        level_data = []
 
-        today_eval = db.session.query(
-            func.sum(EvaluationDetail.score).label("score_sum"),
-            func.sum(Criterion.max_score).label("max_sum"),
-            func.count(EvaluationDetail.id)
-        ).join(Criterion, EvaluationDetail.criterion_id == Criterion.id) \
-            .outerjoin(Evaluation, EvaluationDetail.evaluation_id == Evaluation.id) \
-            .outerjoin(Place, Place.id == Criterion.place_id) \
-            .outerjoin(Site, Site.id == Place.site_id) \
-            .filter(filter_condition) \
-            .filter(func.date(Evaluation.date) == today) \
-            .first()
+        for lvl in levels:
+            if level_type == 'region':
+                filter_condition = Site.region_id == lvl.id
+                level_name = lvl.name
+            elif level_type == 'site':
+                filter_condition = Place.site_id == lvl.id
+                level_name = lvl.name
+            else:  # place
+                filter_condition = Place.name == lvl.name
+                level_name = lvl.name
 
-        today_score = today_eval.score_sum or 0
-        today_max = today_eval.max_sum or 0
-        today_count = today_eval[2] or 0
-        today_percent = round((today_score / today_max * 100), 1) if today_max else 0
+            total_criteria = db.session.query(func.count(Criterion.id)) \
+                                 .join(Place).join(Site).join(Location) \
+                                 .filter(Location.company_id == current_company_id) \
+                                 .filter(filter_condition).scalar() or 0
 
-        total_eval = db.session.query(
-            func.sum(EvaluationDetail.score).label("score_sum"),
-            func.sum(Criterion.max_score).label("max_sum"),
-            func.count(EvaluationDetail.id)
-        ).join(Criterion, EvaluationDetail.criterion_id == Criterion.id) \
-            .outerjoin(Evaluation, EvaluationDetail.evaluation_id == Evaluation.id) \
-            .outerjoin(Place, Place.id == Criterion.place_id) \
-            .outerjoin(Site, Site.id == Place.site_id) \
-            .filter(filter_condition) \
-            .first()
+            today_eval = db.session.query(
+                func.sum(EvaluationDetail.score).label("score_sum"),
+                func.sum(Criterion.max_score).label("max_sum"),
+                func.count(EvaluationDetail.id)
+            ).join(Criterion, EvaluationDetail.criterion_id == Criterion.id) \
+                .outerjoin(Evaluation, EvaluationDetail.evaluation_id == Evaluation.id) \
+                .outerjoin(Place, Place.id == Criterion.place_id) \
+                .outerjoin(Site, Site.id == Place.site_id) \
+                .outerjoin(Location, Location.id == Site.region_id) \
+                .filter(Location.company_id == current_company_id) \
+                .filter(filter_condition) \
+                .filter(func.date(Evaluation.date) == today) \
+                .first()
 
-        total_score = total_eval.score_sum or 0
-        total_max = total_eval.max_sum or 0
-        total_count = total_eval[2] or 0
-        total_percent = round((total_score / total_max * 100), 1) if total_max else 0
+            today_score = today_eval.score_sum or 0
+            today_max = today_eval.max_sum or 0
+            today_count = today_eval[2] or 0
+            today_percent = round((today_score / today_max * 100), 1) if today_max else 0
 
-        level_data.append({
-            "level": level_name,
-            "today_percent": today_percent,
-            "total_percent": total_percent,
-            "today_evaluated": today_count,
-            "total_evaluated": total_count,
-            "total_criteria": total_criteria
-        })
+            total_eval = db.session.query(
+                func.sum(EvaluationDetail.score).label("score_sum"),
+                func.sum(Criterion.max_score).label("max_sum"),
+                func.count(EvaluationDetail.id)
+            ).join(Criterion, EvaluationDetail.criterion_id == Criterion.id) \
+                .outerjoin(Evaluation, EvaluationDetail.evaluation_id == Evaluation.id) \
+                .outerjoin(Place, Place.id == Criterion.place_id) \
+                .outerjoin(Site, Site.id == Place.site_id) \
+                .outerjoin(Location, Location.id == Site.region_id) \
+                .filter(Location.company_id == current_company_id) \
+                .filter(filter_condition) \
+                .first()
+
+            total_score = total_eval.score_sum or 0
+            total_max = total_eval.max_sum or 0
+            total_count = total_eval[2] or 0
+            total_percent = round((total_score / total_max * 100), 1) if total_max else 0
+
+            level_data.append({
+                "level": level_name,
+                "today_percent": today_percent,
+                "total_percent": total_percent,
+                "today_evaluated": today_count,
+                "total_evaluated": total_count,
+                "total_criteria": total_criteria
+            })
+    else:
+        # إذا لم توجد شركة محددة
+        companies_stats = []
+        total_evaluations = 0
+        total_companies = 0
+        daily_stats = {'daily_evaluations': 0, 'daily_avg_score': 0}
+        cumulative_stats = {'total_evaluations': 0, 'total_avg_score': 0}
+        total_regions = 0
+        regions_evaluated = 0
+        total_authorities = 0
+        authorities_evaluated = 0
+        users = []
+        highest_score = 0
+        avg_score = 0
+        total_action_plans = 0
+        closed_action_plans = 0
+        open_action_plans = 0
+        close_percentage = 0
+        top_regions_count = 0
+        completed_authorities = 0
+        time_comparison_data = {}
+        weekly_trends = []
+        monthly_comparison = []
+        daily_performance = []
+        dashboard_users = []
+        chart_data = []
+        level_data = []
+        level_type = 'region'
+
+    # مقارنة الشركات (للمشرف فقط)
+    company_comparison = get_company_comparison_stats() if current_user.role == 'admin' else {}
 
     # ===== تمرير البيانات للـ Jinja2 =====
     return render_template(
@@ -490,13 +633,145 @@ def dashboard():
         time_comparison=time_comparison_data,
         weekly_trends=weekly_trends,
         monthly_comparison=monthly_comparison,
-        daily_performance=daily_performance
+        daily_performance=daily_performance,
+        # البيانات الجديدة للشركات
+        companies_stats=companies_stats,
+        total_companies=total_companies,
+        daily_stats=daily_stats,
+        cumulative_stats=cumulative_stats,
+        company_comparison=company_comparison,
+        # بيانات الفلتر
+        companies_list=companies_list,
+        selected_company_id=current_company_id,
+        current_company=Company.query.get(current_company_id) if current_company_id else None
     )
 
+def get_companies_statistics(company_id=None):
+    """الحصول على إحصائيات الشركات"""
+    query = db.session.query(
+        Company.id,
+        Company.name,
+        func.count(Evaluation.id).label('evaluation_count'),
+        func.count(distinct(User.id)).label('user_count'),
+        func.avg(EvaluationDetail.score).label('avg_score')
+    ).outerjoin(User, Company.id == User.company_id) \
+        .outerjoin(Evaluation, User.id == Evaluation.user_id) \
+        .outerjoin(EvaluationDetail, Evaluation.id == EvaluationDetail.evaluation_id)
 
-# ===== دوال جديدة للمقارنات الزمنية =====
-def get_time_comparison_data():
-    """الحصول على بيانات المقارنة بين الفترات الزمنية"""
+    if company_id:
+        query = query.filter(Company.id == company_id)
+
+    results = query.group_by(Company.id, Company.name).all()
+
+    stats = []
+    for company_id, company_name, eval_count, user_count, avg_score in results:
+        stats.append({
+            'id': company_id,
+            'name': company_name,
+            'evaluation_count': eval_count or 0,
+            'user_count': user_count or 0,
+            'avg_score': round(avg_score or 0, 1)
+        })
+
+    return stats
+
+
+def get_daily_evaluations_stats(company_id=None):
+    """إحصائيات التقييمات اليومية"""
+    today = date.today()
+    query = Evaluation.query.join(User)
+
+    if company_id:
+        query = query.filter(User.company_id == company_id)
+
+    # التقييمات اليومية
+    daily_evaluations = query.filter(func.date(Evaluation.date) == today).count()
+
+    # متوسط الدرجات اليومي
+    daily_avg = db.session.query(func.avg(EvaluationDetail.score)) \
+        .join(Evaluation) \
+        .join(User)
+
+    if company_id:
+        daily_avg = daily_avg.filter(User.company_id == company_id)
+
+    daily_avg = daily_avg.filter(func.date(Evaluation.date) == today).scalar() or 0
+
+    return {
+        'daily_evaluations': daily_evaluations,
+        'daily_avg_score': round(daily_avg, 1)
+    }
+
+
+def get_cumulative_evaluations_stats(company_id=None):
+    """إحصائيات التقييمات التراكمية"""
+    query = Evaluation.query.join(User)
+
+    if company_id:
+        query = query.filter(User.company_id == company_id)
+
+    total_evaluations = query.count()
+
+    total_avg = db.session.query(func.avg(EvaluationDetail.score)) \
+        .join(Evaluation) \
+        .join(User)
+
+    if company_id:
+        total_avg = total_avg.filter(User.company_id == company_id)
+
+    total_avg = total_avg.scalar() or 0
+
+    return {
+        'total_evaluations': total_evaluations,
+        'total_avg_score': round(total_avg, 1)
+    }
+
+
+def get_company_comparison_stats():
+    """مقارنة أداء الشركات (للمشرف العام فقط)"""
+    if current_user.role != 'admin':
+        return []
+
+    # آخر 7 أيام
+    date_range = [date.today() - timedelta(days=i) for i in range(6, -1, -1)]
+
+    companies = Company.query.filter_by(active=True).all()
+    comparison_data = []
+
+    for company in companies:
+        company_data = {
+            'name': company.name,
+            'daily_scores': [],
+            'total_evaluations': 0
+        }
+
+        for day in date_range:
+            daily_avg = db.session.query(func.avg(EvaluationDetail.score)) \
+                            .join(Evaluation) \
+                            .join(User) \
+                            .filter(
+                User.company_id == company.id,
+                func.date(Evaluation.date) == day
+            ).scalar() or 0
+
+            company_data['daily_scores'].append(round(daily_avg, 1))
+
+        company_data['total_evaluations'] = Evaluation.query \
+            .join(User) \
+            .filter(User.company_id == company.id) \
+            .count()
+
+        comparison_data.append(company_data)
+
+    return {
+        'date_labels': [d.strftime('%Y-%m-%d') for d in date_range],
+        'companies_data': comparison_data
+    }
+
+
+# ===== دوال جديدة للمقارنات الزمنية مع دعم الشركات =====
+def get_time_comparison_data(company_id=None):
+    """الحصول على بيانات المقارنة بين الفترات الزمنية مع دعم الشركات"""
     today = date.today()
 
     # الأسبوع الحالي
@@ -515,38 +790,37 @@ def get_time_comparison_data():
     start_of_last_month = (start_of_month - timedelta(days=1)).replace(day=1)
     end_of_last_month = start_of_month - timedelta(days=1)
 
+    # بناء الاستعلام مع فلترة الشركة
+    def build_query():
+        query = db.session.query(
+            func.avg(EvaluationDetail.score).label('avg_score'),
+            func.count(EvaluationDetail.id).label('evaluation_count')
+        ).join(Evaluation).join(User)
+
+        if company_id:
+            query = query.filter(User.company_id == company_id)
+        return query
+
     # بيانات الأسبوع الحالي
-    current_week_data = db.session.query(
-        func.avg(EvaluationDetail.score).label('avg_score'),
-        func.count(EvaluationDetail.id).label('evaluation_count')
-    ).join(Evaluation).filter(
+    current_week_data = build_query().filter(
         Evaluation.date >= start_of_week,
         Evaluation.date <= end_of_week
     ).first()
 
     # بيانات الأسبوع الماضي
-    last_week_data = db.session.query(
-        func.avg(EvaluationDetail.score).label('avg_score'),
-        func.count(EvaluationDetail.id).label('evaluation_count')
-    ).join(Evaluation).filter(
+    last_week_data = build_query().filter(
         Evaluation.date >= start_of_last_week,
         Evaluation.date <= end_of_last_week
     ).first()
 
     # بيانات الشهر الحالي
-    current_month_data = db.session.query(
-        func.avg(EvaluationDetail.score).label('avg_score'),
-        func.count(EvaluationDetail.id).label('evaluation_count')
-    ).join(Evaluation).filter(
+    current_month_data = build_query().filter(
         Evaluation.date >= start_of_month,
         Evaluation.date <= end_of_month
     ).first()
 
     # بيانات الشهر الماضي
-    last_month_data = db.session.query(
-        func.avg(EvaluationDetail.score).label('avg_score'),
-        func.count(EvaluationDetail.id).label('evaluation_count')
-    ).join(Evaluation).filter(
+    last_month_data = build_query().filter(
         Evaluation.date >= start_of_last_month,
         Evaluation.date <= end_of_last_month
     ).first()
@@ -591,8 +865,8 @@ def get_time_comparison_data():
     }
 
 
-def get_weekly_trends():
-    """الحصول على اتجاهات الأداء الأسبوعية"""
+def get_weekly_trends(company_id=None):
+    """الحصول على اتجاهات الأداء الأسبوعية مع دعم الشركات"""
     today = date.today()
     weeks_data = []
 
@@ -600,10 +874,15 @@ def get_weekly_trends():
         start_date = today - timedelta(days=today.weekday() + (i * 7))
         end_date = start_date + timedelta(days=6)
 
-        week_data = db.session.query(
+        query = db.session.query(
             func.avg(EvaluationDetail.score).label('avg_score'),
             func.count(EvaluationDetail.id).label('evaluation_count')
-        ).join(Evaluation).filter(
+        ).join(Evaluation).join(User)
+
+        if company_id:
+            query = query.filter(User.company_id == company_id)
+
+        week_data = query.filter(
             Evaluation.date >= start_date,
             Evaluation.date <= end_date
         ).first()
@@ -616,22 +895,27 @@ def get_weekly_trends():
             'end_date': end_date.strftime('%d/%m')
         })
 
-    return list(reversed(weeks_data))  # عكس القائمة لتبدأ بالأقدم
+    return list(reversed(weeks_data))
 
 
-def get_monthly_comparison():
-    """مقارنة الأداء بين الشهور"""
+def get_monthly_comparison(company_id=None):
+    """مقارنة الأداء بين الشهور مع دعم الشركات"""
     monthly_data = []
 
     for i in range(6):  # آخر 6 شهور
         month_start = (date.today().replace(day=1) - timedelta(days=30 * i)).replace(day=1)
         month_end = (month_start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
 
-        month_stats = db.session.query(
+        query = db.session.query(
             func.avg(EvaluationDetail.score).label('avg_score'),
             func.count(EvaluationDetail.id).label('evaluation_count'),
             func.count(db.distinct(Evaluation.user_id)).label('active_users')
-        ).join(Evaluation).filter(
+        ).join(Evaluation).join(User)
+
+        if company_id:
+            query = query.filter(User.company_id == company_id)
+
+        month_stats = query.filter(
             Evaluation.date >= month_start,
             Evaluation.date <= month_end
         ).first()
@@ -647,18 +931,23 @@ def get_monthly_comparison():
     return list(reversed(monthly_data))
 
 
-def get_daily_performance():
-    """الحصول على أداء الأيام الأخيرة"""
+def get_daily_performance(company_id=None):
+    """الحصول على أداء الأيام الأخيرة مع دعم الشركات"""
     daily_data = []
 
     for i in range(7):  # آخر 7 أيام
         day = date.today() - timedelta(days=i)
 
-        day_stats = db.session.query(
+        query = db.session.query(
             func.avg(EvaluationDetail.score).label('avg_score'),
             func.count(EvaluationDetail.id).label('evaluation_count'),
             func.count(db.distinct(Evaluation.user_id)).label('active_users')
-        ).join(Evaluation).filter(
+        ).join(Evaluation).join(User)
+
+        if company_id:
+            query = query.filter(User.company_id == company_id)
+
+        day_stats = query.filter(
             func.date(Evaluation.date) == day
         ).first()
 
@@ -713,66 +1002,131 @@ def logout():
     flash('تم تسجيل الخروج', 'info')
     return redirect(url_for('login'))
 
+
+# routes.py - تحديث الدوال مع نظام الصلاحيات
+
+# --- إدارة المستخدمين مع الصلاحيات ---
+# routes.py - تحديث دوال إدارة المستخدمين مع نظام الصلاحيات
+
+from functools import wraps
+from flask import redirect, url_for, flash
+from flask_login import current_user
+
+
 # --- إدارة المستخدمين ---
+# --- إدارة المستخدمين ---
+# --- إدارة المستخدمين (الإصدار النهائي المصحح) ---
 @app.route('/users')
 @login_required
+@permission_required('users_view')
 def users():
-    if current_user.role != 'admin':
-        flash('غير مصرح لك', 'danger')
+    try:
+        print(f"=== تشخيص دالة users() ===")
+        print(f"المستخدم الحالي: {current_user.username}")
+        print(f"is_admin (DB): {current_user.is_admin}")
+        print(f"is_administrator: {current_user.is_administrator}")
+        print(f"role: {current_user.role}")
+        print(f"company_id: {current_user.company_id}")
+
+        # استخدام is_administrator بدلاً من is_admin
+        if current_user.is_administrator:
+            users_list = User.query.all()
+            print(f"✅ المسؤول يرى جميع المستخدمين: {len(users_list)} مستخدم")
+
+        elif current_user.role in ['supervisor', 'sub_admin'] and current_user.company_id:
+            users_list = User.query.filter_by(company_id=current_user.company_id).all()
+            print(f"🔹 المشرف يرى مستخدمي الشركة {current_user.company_id}: {len(users_list)} مستخدم")
+
+        else:
+            users_list = [current_user]
+            print(f"👤 مستخدم عادي يرى نفسه فقط: {len(users_list)} مستخدم")
+
+        # طباعة أسماء المستخدمين المعروضين
+        print("=== المستخدمين المعروضين ===")
+        for user in users_list:
+            print(f"👤 {user.username} (id: {user.id}, role: {user.role}, company: {user.company_id})")
+
+        return render_template('admin/users.html', users=users_list)
+
+    except Exception as e:
+        print(f"❌ خطأ في دالة users: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        flash('حدث خطأ في تحميل قائمة المستخدمين', 'danger')
         return redirect(url_for('index'))
-    users = User.query.all()
-    return render_template('admin/users.html', users=users)
 
 
 # --- إضافة مستخدم ---
 @app.route('/users/add', methods=['GET', 'POST'])
 @login_required
+@permission_required('users_add')
+@company_access_required
 def add_user():
-    if current_user.role not in ['admin', 'supervisor']:
-        flash('غير مصرح لك', 'danger')
-        return redirect(url_for('index'))
-
     form = UserForm()
     form.active.choices = [('1', 'نعم'), ('0', 'لا')]
-    # تمرير جميع المستخدمين والمناطق للقالب
+
+    # تحديد الأدوار المتاحة بناءً على صلاحيات المستخدم
+    if current_user.is_admin:
+        form.role.choices = [('admin', 'مسؤول'), ('supervisor', 'مشرف'), ('sub_admin', 'مشرف فرعي'), ('user', 'مستخدم')]
+    elif current_user.role == 'supervisor':
+        form.role.choices = [('sub_admin', 'مشرف فرعي'), ('user', 'مستخدم')]
+    else:
+        form.role.choices = [('user', 'مستخدم')]
+
+    # تحديد الشركات المتاحة
+    if current_user.is_admin:
+        companies = Company.query.filter_by(is_active=True).all()
+        form.company_id.choices = [(c.id, c.name) for c in companies]
+    else:
+        # المشرفين الفرعيين والمشرفين يضيفون مستخدمين لشركتهم فقط
+        form.company_id.choices = [(current_user.company_id, current_user.company.name)]
+        form.company_id.data = current_user.company_id
+
     users_list = User.query.all()
     regions_list = Location.query.order_by(Location.name).all()
+
+    if form.region_ids.data is None:
+        form.region_ids.data = []
 
     if form.validate_on_submit():
         if User.query.filter_by(username=form.username.data).first():
             flash('اسم المستخدم موجود مسبقاً', 'warning')
             return render_template('admin/user_form.html', form=form, users=users_list, regions=regions_list)
-        # مثال: إضافة مستخدم
-        user = User(
-            fullname=form.fullname.data,
-            username=form.username.data,
-            email=form.email.data,
-            role=form.role.data,
-            active=(form.active.data == '1')
-        )
-        user.set_password(form.password.data)
-        # ربط المستخدم بالمناطق المختارة
-        user.regions = Location.query.filter(Location.id.in_(form.region_ids.data)).all()
-        db.session.add(user)
-        db.session.commit()
 
-        if form.password.data:
-            user.set_password(form.password.data)
-        else:
+        if not form.password.data:
             flash('كلمة المرور مطلوبة', 'warning')
-            return render_template(
-                'admin/user_form.html',
-                form=form,
-                users=users_list,
-                regions=regions_list,
-                selected_user_id=None  # لا يوجد مستخدم محدد
+            return render_template('admin/user_form.html', form=form, users=users_list, regions=regions_list)
+
+        try:
+            # تحديد company_id بناءً على صلاحيات المستخدم
+            company_id = form.company_id.data
+            if current_user.role in ['supervisor', 'sub_admin']:
+                company_id = current_user.company_id
+
+            user = User(
+                fullname=form.fullname.data,
+                username=form.username.data,
+                email=form.email.data,
+                role=form.role.data,
+                active=(form.active.data == '1'),
+                company_id=company_id
             )
+            user.set_password(form.password.data)
 
-        db.session.add(user)
-        db.session.commit()
-        flash('تم إضافة المستخدم بنجاح', 'success')
-        return redirect(url_for('users'))
+            db.session.add(user)
+            db.session.flush()
 
+            if form.region_ids.data:
+                selected_regions = Location.query.filter(Location.id.in_(form.region_ids.data)).all()
+                user.regions = selected_regions
+
+            db.session.commit()
+            flash('تم إضافة المستخدم بنجاح', 'success')
+            return redirect(url_for('users'))
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f'حدث خطأ أثناء إضافة المستخدم: {str(e)}', 'danger')
 
     return render_template('admin/user_form.html', form=form, users=users_list, regions=regions_list)
 
@@ -780,82 +1134,569 @@ def add_user():
 # --- تعديل مستخدم ---
 @app.route('/users/edit/<int:user_id>', methods=['GET', 'POST'])
 @login_required
+@permission_required('users_edit')
+@user_management_required
 def edit_user(user_id):
-    if current_user.role not in ['admin', 'supervisor']:
-        flash('غير مصرح لك', 'danger')
-        return redirect(url_for('index'))
+    user = db.session.get(User, user_id)
+    if not user:
+        flash('المستخدم غير موجود', 'danger')
+        return redirect(url_for('users'))
 
-    user = User.query.get_or_404(user_id)
     form = UserForm(obj=user)
     form.active.choices = [('1', 'نعم'), ('0', 'لا')]
-    form.user_id = user.id
+
+    # تحديد الأدوار المتاحة
+    if current_user.is_admin:
+        form.role.choices = [('admin', 'مسؤول'), ('supervisor', 'مشرف'), ('sub_admin', 'مشرف فرعي'), ('user', 'مستخدم')]
+    elif current_user.role == 'supervisor':
+        form.role.choices = [('sub_admin', 'مشرف فرعي'), ('user', 'مستخدم')]
+    else:
+        form.role.choices = [('user', 'مستخدم')]
+
+    # تحديد الشركات المتاحة
+    if current_user.is_admin:
+        companies = Company.query.filter_by(is_active=True).all()
+        form.company_id.choices = [(c.id, c.name) for c in companies]
+    else:
+        form.company_id.choices = [(current_user.company_id, current_user.company.name)]
+
     users_list = User.query.all()
     regions_list = Location.query.order_by(Location.name).all()
 
-    # تعطيل التحقق الإجباري لكلمة المرور في التعديل
+    if form.region_ids.data is None:
+        form.region_ids.data = []
+
     form.password.validators = []
     form.password_confirm.validators = [EqualTo('password', message='كلمتا المرور غير متطابقتين')]
 
-    # ✅ ضبط القيمة الافتراضية فقط عند GET
     if request.method == "GET":
         form.active.data = '1' if user.active else '0'
         form.region_ids.data = [r.id for r in user.regions]
+        form.company_id.data = user.company_id
 
     if form.validate_on_submit():
         if User.query.filter(User.id != user.id, User.username == form.username.data).first():
             flash('اسم المستخدم موجود مسبقاً', 'warning')
-            return render_template(
-                'admin/user_form.html',
-                form=form,
-                users=users_list,
-                regions=regions_list,
-                selected_user_id=user.id
-            )
+            return render_template('admin/user_form.html', form=form, users=users_list, regions=regions_list,
+                                   selected_user_id=user.id)
 
-        user.fullname = form.fullname.data
-        user.username = form.username.data
-        user.email = form.email.data
-        user.role = form.role.data
-        user.active = True if form.active.data == '1' else False
+        try:
+            user.fullname = form.fullname.data
+            user.username = form.username.data
+            user.email = form.email.data
+            user.role = form.role.data
+            user.active = (form.active.data == '1')
 
-        if form.password.data:
-            user.set_password(form.password.data)
+            # فقط المسؤولون يمكنهم تغيير الشركة
+            if current_user.is_admin:
+                user.company_id = form.company_id.data
 
-        # تحديث المناطق
-        user.regions = Location.query.filter(Location.id.in_(form.region_ids.data)).all()
-        db.session.commit()
+            if form.password.data:
+                user.set_password(form.password.data)
 
-        flash('تم تعديل بيانات المستخدم', 'success')
-        return redirect(url_for('users'))
+            if form.region_ids.data:
+                user.regions = Location.query.filter(Location.id.in_(form.region_ids.data)).all()
+            else:
+                user.regions = []
 
-    return render_template('admin/user_form.html', form=form, users=users_list, regions=regions_list)
+            db.session.commit()
+            flash('تم تعديل بيانات المستخدم', 'success')
+            return redirect(url_for('users'))
 
+        except Exception as e:
+            db.session.rollback()
+            flash(f'حدث خطأ أثناء تعديل المستخدم: {str(e)}', 'danger')
+
+    return render_template('admin/user_form.html', form=form, users=users_list, regions=regions_list,
+                           selected_user_id=user.id)
+
+
+# --- حذف مستخدم ---
 @app.route('/users/delete/<int:user_id>', methods=['POST'])
 @login_required
+@permission_required('users_delete')
+@user_management_required
 def delete_user(user_id):
-    if current_user.role != 'admin':
-        flash('غير مصرح لك', 'danger')
-        return redirect(url_for('index'))
-
-    user = User.query.get_or_404(user_id)
+    user = db.session.get(User, user_id)
+    if not user:
+        flash('المستخدم غير موجود', 'danger')
+        return redirect(url_for('users'))
 
     if user.username == 'admin':
         flash('لا يمكن حذف المشرف الرئيسي', 'warning')
         return redirect(url_for('users'))
 
     if user.evaluations:
-        # بدل الحذف، اجعل المستخدم غير نشط
         user.active = False
         db.session.commit()
         flash('المستخدم مرتبط بتقييمات، تم تغييره إلى غير نشط بدلاً من الحذف', 'info')
         return redirect(url_for('users'))
 
-    # إذا لم يكن مرتبطاً بأي تقييم، يمكن حذفه
-    db.session.delete(user)
-    db.session.commit()
-    flash('تم حذف المستخدم', 'success')
+    try:
+        db.session.delete(user)
+        db.session.commit()
+        flash('تم حذف المستخدم بنجاح', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'حدث خطأ أثناء حذف المستخدم: {str(e)}', 'danger')
+
     return redirect(url_for('users'))
 
+
+# routes_permissions.py - دوال إدارة الصلاحيات للمشرفين الفرعيين
+
+@app.route('/admin/sub-admins/<int:admin_id>/permissions', methods=['GET', 'POST'])
+@login_required
+@permission_required('manage_permissions')
+def manage_sub_admin_permissions(admin_id):
+    """إدارة صلاحيات المشرف الفرعي"""
+    sub_admin = User.query.get_or_404(admin_id)
+
+    # التأكد من أن المستخدم مشرف فرعي وفي نفس الشركة
+    if sub_admin.role != 'sub_admin':
+        flash('المستخدم المحدد ليس مشرفاً فرعياً', 'danger')
+        return redirect(url_for('users'))
+
+    if not current_user.can_manage_user(sub_admin):
+        flash('غير مصرح لك بإدارة صلاحيات هذا المشرف', 'danger')
+        return redirect(url_for('users'))
+
+    # الصلاحيات المتاحة للمشرفين الفرعيين
+    available_permissions = {
+        'users': [
+            {'code': 'users_view', 'name': 'عرض المستخدمين'},
+            {'code': 'users_add', 'name': 'إضافة مستخدمين'},
+            {'code': 'users_edit', 'name': 'تعديل المستخدمين'},
+            {'code': 'users_delete', 'name': 'حذف المستخدمين'}
+        ],
+        'evaluations': [
+            {'code': 'evaluations_view', 'name': 'عرض التقييمات'},
+            {'code': 'evaluations_add', 'name': 'إضافة تقييمات'},
+            {'code': 'evaluations_edit', 'name': 'تعديل التقييمات'},
+            {'code': 'evaluations_delete', 'name': 'حذف التقييمات'}
+        ],
+        'reports': [
+            {'code': 'reports_view', 'name': 'عرض التقارير'},
+            {'code': 'reports_export', 'name': 'تصدير التقارير'}
+        ]
+    }
+
+    if request.method == 'POST':
+        try:
+            # حذف الصلاحيات الحالية
+            UserPermission.query.filter_by(user_id=admin_id).delete()
+
+            # إضافة الصلاحيات الجديدة
+            selected_permissions = request.form.getlist('permissions')
+            for perm_code in selected_permissions:
+                user_perm = UserPermission(
+                    user_id=admin_id,
+                    permission_code=perm_code
+                )
+                db.session.add(user_perm)
+
+            db.session.commit()
+            flash('تم تحديث صلاحيات المشرف الفرعي بنجاح', 'success')
+            return redirect(url_for('users'))
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f'حدث خطأ أثناء تحديث الصلاحيات: {str(e)}', 'danger')
+
+    # الصلاحيات الحالية للمشرف
+    current_permissions = [up.permission_code for up in sub_admin.user_permissions]
+
+    return render_template('admin/sub_admin_permissions.html',
+                           sub_admin=sub_admin,
+                           available_permissions=available_permissions,
+                           current_permissions=current_permissions)
+
+@app.route('/api/user/<int:user_id>/permissions')
+@login_required
+def get_user_permissions(user_id):
+    """API للحصول على صلاحيات مستخدم"""
+    user = User.query.get_or_404(user_id)
+    return jsonify({
+        'permissions': user.all_permissions,
+        'role': user.role,
+        'company_id': user.company_id
+    })
+
+
+# دالة لتهيئة الصلاحيات الافتراضية
+def initialize_default_permissions():
+    """تهيئة الصلاحيات الافتراضية في النظام"""
+    default_permissions = [
+        # صلاحيات إدارة المستخدمين
+        {'name': 'عرض المستخدمين', 'code': 'users_view', 'category': 'users'},
+        {'name': 'إضافة مستخدمين', 'code': 'users_add', 'category': 'users'},
+        {'name': 'تعديل المستخدمين', 'code': 'users_edit', 'category': 'users'},
+        {'name': 'حذف المستخدمين', 'code': 'users_delete', 'category': 'users'},
+
+        # صلاحيات التقييمات
+        {'name': 'عرض التقييمات', 'code': 'evaluations_view', 'category': 'evaluations'},
+        {'name': 'إضافة تقييمات', 'code': 'evaluations_add', 'category': 'evaluations'},
+        {'name': 'تعديل التقييمات', 'code': 'evaluations_edit', 'category': 'evaluations'},
+        {'name': 'حذف التقييمات', 'code': 'evaluations_delete', 'category': 'evaluations'},
+
+        # صلاحيات التقارير
+        {'name': 'عرض التقارير', 'code': 'reports_view', 'category': 'reports'},
+        {'name': 'تصدير التقارير', 'code': 'reports_export', 'category': 'reports'},
+
+        # صلاحيات الإعدادات
+        {'name': 'عرض الإعدادات', 'code': 'settings_view', 'category': 'settings'},
+        {'name': 'تعديل الإعدادات', 'code': 'settings_edit', 'category': 'settings'},
+
+        # صلاحيات إدارة الصلاحيات
+        {'name': 'إدارة الصلاحيات', 'code': 'manage_permissions', 'category': 'admin'},
+    ]
+
+    for perm_data in default_permissions:
+        if not Permission.query.filter_by(code=perm_data['code']).first():
+            permission = Permission(**perm_data)
+            db.session.add(permission)
+
+    db.session.commit()
+
+
+# routes_debug.py - دوال للمساعدة في تشخيص المشكلة
+@app.route('/debug/users')
+@login_required
+def debug_users_view():
+    """صفحة debug لعرض معلومات المستخدمين"""
+    if not current_user.is_admin:
+        flash('غير مصرح لك', 'danger')
+        return redirect(url_for('index'))
+
+    all_users = User.query.all()
+    debug_info = []
+
+    for user in all_users:
+        user_info = {
+            'id': user.id,
+            'username': user.username,
+            'role': user.role,
+            'company_id': user.company_id,
+            'company_name': user.company.name if user.company else 'لا يوجد',
+            'is_admin': user.is_admin,
+            'active': user.active,
+            'permissions_count': len(user.all_permissions)
+        }
+        debug_info.append(user_info)
+
+    return render_template('admin/debug_users.html', users_debug=debug_info)
+
+
+@app.route('/debug/permissions/<int:user_id>')
+@login_required
+def debug_user_permissions(user_id):
+    """عرض صلاحيات مستخدم معين"""
+    if not current_user.is_admin:
+        flash('غير مصرح لك', 'danger')
+        return redirect(url_for('index'))
+
+    user = User.query.get_or_404(user_id)
+
+    return jsonify({
+        'user': {
+            'id': user.id,
+            'username': user.username,
+            'role': user.role,
+            'company_id': user.company_id,
+            'is_admin': user.is_admin
+        },
+        'role_permissions': user.get_role_permissions(),
+        'custom_permissions': [up.permission_code for up in user.user_permissions],
+        'all_permissions': user.all_permissions
+    })
+
+
+# routes_permissions.py - إصلاح دوال إدارة الصلاحيات
+@app.route('/admin/sub-admins/<int:admin_id>/permissions', methods=['GET', 'POST'])
+@login_required
+def manage_sub_admin_permissions_view(admin_id):
+    """إدارة صلاحيات المشرف الفرعي"""
+    # التحقق من الصلاحية
+    if not current_user.has_permission('manage_permissions'):
+        flash('غير مصرح لك بإدارة الصلاحيات', 'danger')
+        return redirect(url_for('users'))
+
+    sub_admin = User.query.get_or_404(admin_id)
+
+    # التأكد من أن المستخدم مشرف فرعي
+    if sub_admin.role != 'sub_admin':
+        flash('المستخدم المحدد ليس مشرفاً فرعياً', 'danger')
+        return redirect(url_for('users'))
+
+    # التحقق من أن المستخدم الحالي يمكنه إدارة هذا المشرف
+    if not current_user.can_manage_user(sub_admin):
+        flash('غير مصرح لك بإدارة صلاحيات هذا المشرف', 'danger')
+        return redirect(url_for('users'))
+
+    # الصلاحيات المتاحة للمشرفين الفرعيين
+    available_permissions = {
+        'users': [
+            {'code': 'users_view', 'name': 'عرض المستخدمين'},
+            {'code': 'users_add', 'name': 'إضافة مستخدمين'},
+            {'code': 'users_edit', 'name': 'تعديل المستخدمين'},
+            {'code': 'users_delete', 'name': 'حذف المستخدمين'}
+        ],
+        'evaluations': [
+            {'code': 'evaluations_view', 'name': 'عرض التقييمات'},
+            {'code': 'evaluations_add', 'name': 'إضافة تقييمات'},
+            {'code': 'evaluations_edit', 'name': 'تعديل التقييمات'},
+            {'code': 'evaluations_delete', 'name': 'حذف التقييمات'}
+        ],
+        'reports': [
+            {'code': 'reports_view', 'name': 'عرض التقارير'},
+            {'code': 'reports_export', 'name': 'تصدير التقارير'}
+        ]
+    }
+
+    if request.method == 'POST':
+        try:
+            # حذف الصلاحيات الحالية
+            UserPermission.query.filter_by(user_id=admin_id).delete()
+
+            # إضافة الصلاحيات الجديدة
+            selected_permissions = request.form.getlist('permissions')
+            for perm_code in selected_permissions:
+                user_perm = UserPermission(
+                    user_id=admin_id,
+                    permission_code=perm_code
+                )
+                db.session.add(user_perm)
+
+            db.session.commit()
+            flash('تم تحديث صلاحيات المشرف الفرعي بنجاح', 'success')
+            return redirect(url_for('users'))
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f'حدث خطأ أثناء تحديث الصلاحيات: {str(e)}', 'danger')
+
+    # الصلاحيات الحالية للمشرف
+    current_permissions = [up.permission_code for up in sub_admin.user_permissions]
+
+    return render_template('admin/sub_admin_permissions.html',
+                           sub_admin=sub_admin,
+                           available_permissions=available_permissions,
+                           current_permissions=current_permissions)
+
+# --- إدارة الشركات ---
+# --- إدارة الشركات ---
+@app.route('/companies')
+@login_required
+def companies():
+    if current_user.role != 'admin':
+        flash('غير مصرح لك بالوصول إلى هذه الصفحة', 'danger')
+        return redirect(url_for('dashboard'))
+
+    # فلترة الشركات
+    active_filter = request.args.get('active', '')
+    query = Company.query
+
+    if active_filter == '1':
+        query = query.filter(Company.active == True)
+    elif active_filter == '0':
+        query = query.filter(Company.active == False)
+
+    companies_list = query.order_by(Company.name).all()
+
+    # إحصائيات عامة
+    total_companies = Company.query.count()
+    active_companies = Company.query.filter_by(active=True).count()
+    inactive_companies = total_companies - active_companies
+
+    return render_template(
+        'admin/companies.html',
+        companies=companies_list,
+        total_companies=total_companies,
+        active_companies=active_companies,
+        inactive_companies=inactive_companies,
+        active_filter=active_filter
+    )
+
+
+@app.route('/companies/add', methods=['GET', 'POST'])
+@login_required
+def add_company():
+    if current_user.role != 'admin':
+        flash('غير مصرح لك', 'danger')
+        return redirect(url_for('companies'))
+
+    form = CompanyForm()
+
+    if form.validate_on_submit():
+        try:
+            company = Company(
+                name=form.name.data,
+                code=form.code.data,
+                active=(form.active.data == '1')
+            )
+            db.session.add(company)
+            db.session.commit()
+
+            flash('تم إضافة الشركة بنجاح', 'success')
+            return redirect(url_for('companies'))
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f'حدث خطأ أثناء إضافة الشركة: {str(e)}', 'danger')
+
+    return render_template('admin/company_form.html', form=form, title='إضافة شركة جديدة')
+
+
+@app.route('/companies/edit/<int:company_id>', methods=['GET', 'POST'])
+@login_required
+def edit_company(company_id):
+    if current_user.role != 'admin':
+        flash('غير مصرح لك', 'danger')
+        return redirect(url_for('companies'))
+
+    company = Company.query.get_or_404(company_id)
+    form = CompanyForm(obj=company)
+
+    if request.method == 'GET':
+        form.active.data = '1' if company.active else '0'
+
+    if form.validate_on_submit():
+        try:
+            company.name = form.name.data
+            company.code = form.code.data
+            company.active = (form.active.data == '1')
+
+            db.session.commit()
+            flash('تم تعديل بيانات الشركة بنجاح', 'success')
+            return redirect(url_for('companies'))
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f'حدث خطأ أثناء تعديل الشركة: {str(e)}', 'danger')
+
+    return render_template('admin/company_form.html', form=form, company=company, title='تعديل شركة')
+
+
+@app.route('/companies/delete/<int:company_id>', methods=['POST'])
+@login_required
+def delete_company(company_id):
+    if current_user.role != 'admin':
+        flash('غير مصرح لك', 'danger')
+        return redirect(url_for('companies'))
+
+    company = Company.query.get_or_404(company_id)
+
+    # التحقق من عدم وجود بيانات مرتبطة
+    if company.users or company.locations or company.evaluation_authorities:
+        flash('لا يمكن حذف الشركة لأنها مرتبطة ببيانات أخرى (مستخدمين، مناطق، جهات تقييم)', 'danger')
+        return redirect(url_for('companies'))
+
+    try:
+        db.session.delete(company)
+        db.session.commit()
+        flash('تم حذف الشركة بنجاح', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'حدث خطأ أثناء حذف الشركة: {str(e)}', 'danger')
+
+    return redirect(url_for('companies'))
+
+
+@app.route('/companies/toggle/<int:company_id>', methods=['POST'])
+@login_required
+def toggle_company(company_id):
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'message': 'غير مصرح لك'})
+
+    company = Company.query.get_or_404(company_id)
+
+    try:
+        company.active = not company.active
+        db.session.commit()
+
+        status = 'نشطة' if company.active else 'غير نشطة'
+        flash(f'تم تغيير حالة الشركة إلى {status}', 'success')
+        return jsonify({'success': True, 'active': company.active})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+
+@app.route('/companies/statistics')
+@login_required
+def companies_statistics():
+    if current_user.role != 'admin':
+        return jsonify({'error': 'غير مصرح لك'})
+
+    companies = Company.query.all()
+    stats = []
+
+    for company in companies:
+        stats.append({
+            'id': company.id,
+            'name': company.name,
+            'users_count': len(company.users),
+            'locations_count': len(company.locations),
+            'authorities_count': len(company.evaluation_authorities),
+            'evaluations_count': Evaluation.query.join(User).filter(User.company_id == company.id).count(),
+            'active': company.active
+        })
+
+    return jsonify(stats)
+
+
+# دالة لنقل البيانات إلى الشركة الجديدة
+def migrate_data_to_company(company_id):
+    """نقل جميع البيانات إلى شركة محددة"""
+    try:
+        company = Company.query.get(company_id)
+        if not company:
+            return False, "الشركة غير موجودة"
+
+        # نقل المستخدمين
+        users = User.query.filter(User.company_id.is_(None)).all()
+        for user in users:
+            user.company_id = company_id
+
+        # نقل المناطق
+        locations = Location.query.filter(Location.company_id.is_(None)).all()
+        for location in locations:
+            location.company_id = company_id
+
+        # نقل جهات التقييم
+        authorities = EvaluationAuthority.query.filter(EvaluationAuthority.company_id.is_(None)).all()
+        for authority in authorities:
+            authority.company_id = company_id
+
+        # نقل تفاصيل التقييم
+        evaluation_details = EvaluationDetail.query.filter(EvaluationDetail.company_id.is_(None)).all()
+        for detail in evaluation_details:
+            detail.company_id = company_id
+
+        db.session.commit()
+        return True, f"تم نقل جميع البيانات إلى شركة {company.name}"
+
+    except Exception as e:
+        db.session.rollback()
+        return False, f"حدث خطأ أثناء نقل البيانات: {str(e)}"
+
+
+@app.route('/companies/migrate_data/<int:company_id>', methods=['POST'])
+@login_required
+def migrate_company_data(company_id):
+    if current_user.role != 'admin':
+        flash('غير مصرح لك', 'danger')
+        return redirect(url_for('companies'))
+
+    success, message = migrate_data_to_company(company_id)
+
+    if success:
+        flash(message, 'success')
+    else:
+        flash(message, 'danger')
+
+    return redirect(url_for('companies'))
 
 @app.route('/authorities', methods=['GET', 'POST'])
 @login_required
@@ -924,7 +1765,6 @@ from sqlalchemy.orm import joinedload
 # Location (المنطقة)
 # Site (الموقع الفرعي)
 # Place (المكان)
-
 @app.route('/locations', methods=['GET', 'POST'])
 @login_required
 def locations():
@@ -937,46 +1777,92 @@ def locations():
     form_site = SiteForm(prefix='site')
     form_place = PlaceForm(prefix='place')
 
-    form_site.region_id.choices = [(r.id, r.name) for r in Location.query.order_by(Location.name).all()]
-    form_place.site_id.choices = [(s.id, s.name) for s in Site.query.order_by(Site.name).all()]
+    # ✅ تحديث: جلب الشركات للمناطق
+    companies = Company.query.filter_by(active=True).order_by(Company.name).all()
+    form_region.company_id.choices = [(c.id, c.name) for c in companies]
+
+    # ✅ تصحيح: استخدام العلاقات الصحيحة حسب النماذج
+    form_site.region_id.choices = [(r.id, f"{r.name} - {r.company.name}") for r in
+                                   Location.query.options(db.joinedload(Location.company)).order_by(
+                                       Location.name).all()]
+    form_place.site_id.choices = [(s.id, f"{s.name} - {s.location.name}") for s in
+                                  Site.query.options(db.joinedload(Site.location)).order_by(
+                                      Site.name).all()]  # ✅ location وليس region
 
     # *** إضافة مناطق، مواقع، أماكن ***
     if request.method == 'POST':
         # إضافة منطقة
         if 'submit_region' in request.form and form_region.validate():
-            new_region = Location(name=form_region.name.data)
-            db.session.add(new_region)
-            db.session.commit()
-            flash('تمت إضافة المنطقة بنجاح', 'success')
-            return redirect(url_for('locations'))
+            try:
+                new_region = Location(
+                    name=form_region.name.data,
+                    company_id=form_region.company_id.data
+                )
+                db.session.add(new_region)
+                db.session.commit()
+                flash('تمت إضافة المنطقة بنجاح', 'success')
+                return redirect(url_for('locations'))
+            except Exception as e:
+                db.session.rollback()
+                flash(f'حدث خطأ أثناء إضافة المنطقة: {str(e)}', 'danger')
 
         # إضافة موقع
         elif 'submit_site' in request.form and form_site.validate():
-            new_site = Site(name=form_site.name.data, region_id=form_site.region_id.data)
-            db.session.add(new_site)
-            db.session.commit()
-            flash('تمت إضافة الموقع بنجاح', 'success')
-            return redirect(url_for('locations'))
+            try:
+                new_site = Site(
+                    name=form_site.name.data,
+                    region_id=form_site.region_id.data  # ✅ هذا صحيح لأن الحقل في النموذج يسمى region_id
+                )
+                db.session.add(new_site)
+                db.session.commit()
+                flash('تمت إضافة الموقع بنجاح', 'success')
+                return redirect(url_for('locations'))
+            except Exception as e:
+                db.session.rollback()
+                flash(f'حدث خطأ أثناء إضافة الموقع: {str(e)}', 'danger')
 
         # إضافة مكان
         elif 'submit_place' in request.form and form_place.validate():
-            new_place = Place(name=form_place.name.data, site_id=form_place.site_id.data)
-            db.session.add(new_place)
-            db.session.commit()
-            flash('تمت إضافة المكان بنجاح', 'success')
-            return redirect(url_for('locations'))
+            try:
+                new_place = Place(
+                    name=form_place.name.data,
+                    site_id=form_place.site_id.data
+                )
+                db.session.add(new_place)
+                db.session.commit()
+                flash('تمت إضافة المكان بنجاح', 'success')
+                return redirect(url_for('locations'))
+            except Exception as e:
+                db.session.rollback()
+                flash(f'حدث خطأ أثناء إضافة المكان: {str(e)}', 'danger')
 
-    # جلب الهيكل مع العلاقات
+    # ✅ تحديث: جلب الهيكل مع العلاقات والشركات
     locations = Location.query.options(
-        joinedload(Location.sites).joinedload(Site.places)
+        db.joinedload(Location.company),
+        db.joinedload(Location.sites).joinedload(Site.places)
     ).order_by(Location.name).all()
+
+    # ✅ إحصائيات الشركات
+    companies_stats = []
+    for company in companies:
+        company_locations = [loc for loc in locations if loc.company_id == company.id]
+        total_sites = sum(len(loc.sites) for loc in company_locations)
+        total_places = sum(len(site.places) for loc in company_locations for site in loc.sites)
+
+        companies_stats.append({
+            'company': company,
+            'locations_count': len(company_locations),
+            'sites_count': total_sites,
+            'places_count': total_places
+        })
 
     return render_template('admin/locations.html',
                            form_region=form_region,
                            form_site=form_site,
                            form_place=form_place,
-                           locations=locations)
-
+                           locations=locations,
+                           companies=companies,
+                           companies_stats=companies_stats)
 
 # --- تعديل وحذف المناطق (Locations) ---
 @app.route('/locations/edit/location/<int:location_id>', methods=['POST'])
@@ -986,14 +1872,27 @@ def edit_location(location_id):
         flash('غير مصرح لك', 'danger')
         return redirect(url_for('locations'))
 
-    location = Location.query.get_or_404(location_id)
+    location = db.session.get(Location, location_id)  # ✅ استخدام db.session.get
+    if not location:
+        flash('المنطقة غير موجودة', 'danger')
+        return redirect(url_for('locations'))
+
     new_name = request.form.get('new_name')
+    company_id = request.form.get('company_id')  # ✅ إمكانية تعديل الشركة
+
     if new_name:
-        location.name = new_name
-        db.session.commit()
-        flash('تم تعديل اسم المنطقة بنجاح', 'success')
+        try:
+            location.name = new_name
+            if company_id:
+                location.company_id = int(company_id)
+            db.session.commit()
+            flash('تم تعديل بيانات المنطقة بنجاح', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'حدث خطأ أثناء تعديل المنطقة: {str(e)}', 'danger')
     else:
         flash('اسم المنطقة لا يمكن أن يكون فارغاً', 'warning')
+
     return redirect(url_for('locations'))
 
 
@@ -1004,14 +1903,28 @@ def delete_location(location_id):
         flash('غير مصرح لك', 'danger')
         return redirect(url_for('locations'))
 
-    location = Location.query.get_or_404(location_id)
-    children_count = Site.query.filter_by(region_id=location_id).count()
-    if children_count > 0:
-        flash('لا يمكن حذف المنطقة لأنها تحتوي على مواقع فرعية', 'danger')
-    else:
-        db.session.delete(location)
-        db.session.commit()
-        flash('تم حذف المنطقة بنجاح', 'success')
+    location = db.session.get(Location, location_id)  # ✅ استخدام db.session.get
+    if not location:
+        flash('المنطقة غير موجودة', 'danger')
+        return redirect(url_for('locations'))
+
+    try:
+        children_count = Site.query.filter_by(region_id=location_id).count()
+        if children_count > 0:
+            flash('لا يمكن حذف المنطقة لأنها تحتوي على مواقع فرعية', 'danger')
+        else:
+            # ✅ التحقق من عدم وجود مستخدمين مرتبطين بالمنطقة
+            users_count = db.session.query(user_regions).filter_by(location_id=location_id).count()
+            if users_count > 0:
+                flash('لا يمكن حذف المنطقة لأنها مرتبطة بمستخدمين', 'danger')
+            else:
+                db.session.delete(location)
+                db.session.commit()
+                flash('تم حذف المنطقة بنجاح', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'حدث خطأ أثناء حذف المنطقة: {str(e)}', 'danger')
+
     return redirect(url_for('locations'))
 
 
@@ -1331,6 +2244,7 @@ def get_site_criteria(site_id):
 # ---------------------
 # صفحة التقييمات (مع دعم place_id لكل معيار)
 # ---------------------
+
 @app.route('/evaluations', methods=['GET', 'POST'])
 @login_required
 def evaluations():
@@ -2003,36 +2917,49 @@ def health_check():
         'timestamp': datetime.now().isoformat()
     })
 
+
 def initialize_database():
-    """تهيئة قاعدة البيانات وإنشاء المستخدم الافتراضي"""
+    """تهيئة قاعدة البيانات وإنشاء البيانات الافتراضية"""
     with app.app_context():
         try:
-            # إنشاء الجداول
             db.create_all()
 
-            # إنشاء المستخدم الافتراضي إذا لم يكن موجوداً
+            # إنشاء الشركة اليمنية لتكرير السكر
+            yemen_sugar_company = Company.query.filter_by(name='الشركة اليمنية لتكرير السكر').first()
+            if not yemen_sugar_company:
+                yemen_sugar_company = Company(
+                    name='الشركة اليمنية لتكرير السكر',
+                    code='YSRC',
+                    description='الشركة اليمنية الرائدة في مجال تكرير وإنتاج السكر',
+                    address='الجمهورية اليمنية',
+                    phone='+967123456789',
+                    email='info@yemen-sugar.com',
+                    active=True
+                )
+                db.session.add(yemen_sugar_company)
+                db.session.flush()
+
+            # إنشاء المستخدم الافتراضي
             if not User.query.filter_by(username='admin').first():
                 admin = User(
                     fullname='المشرف الرئيسي',
                     username='admin',
                     email='admin@system.com',
                     role='admin',
-                    active=True
+                    company_id=yemen_sugar_company.id,
+                    active=True,
+                    is_admin=True
                 )
                 admin.set_password('123456')
                 db.session.add(admin)
-                db.session.commit()
-                print("✅ تم إنشاء المستخدم الافتراضي: admin / 123456")
 
-            print("✅ تم تهيئة قاعدة البيانات بنجاح")
+            db.session.commit()
+            print("✅ تم إنشاء البيانات الافتراضية بنجاح")
 
         except Exception as e:
-            print(f"❌ خطأ في تهيئة قاعدة البيانات: {e}")
             db.session.rollback()
+            print(f"❌ خطأ في تهيئة قاعدة البيانات: {e}")
 
-
-# استدعاء التهيئة عند التشغيل
-initialize_database()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))

@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block title %}إدارة الشركات{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- رأس الصفحة -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">إدارة الشركات</h1>
+        <a href="{{ url_for('add_company') }}" class="btn btn-primary">
+            <i class="fas fa-plus fa-sm"></i> إضافة شركة جديدة
+        </a>
+    </div>
+
+    <!-- بطاقات الإحصائيات -->
+    <div class="row">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                إجمالي الشركات</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_companies }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-building fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                الشركات النشطة</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ active_companies }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-check-circle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                الشركات غير النشطة</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ inactive_companies }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-pause-circle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- فلترة -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">تصفية الشركات</h6>
+        </div>
+        <div class="card-body">
+            <form method="get" class="form-inline">
+                <div class="form-group mr-3">
+                    <select name="active" class="form-control">
+                        <option value="">جميع الشركات</option>
+                        <option value="1" {% if active_filter == '1' %}selected{% endif %}>النشطة فقط</option>
+                        <option value="0" {% if active_filter == '0' %}selected{% endif %}>غير النشطة</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">تصفية</button>
+                <a href="{{ url_for('companies') }}" class="btn btn-secondary mr-2">إعادة تعيين</a>
+            </form>
+        </div>
+    </div>
+
+    <!-- جدول الشركات -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">قائمة الشركات</h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th>اسم الشركة</th>
+                            <th>الكود</th>
+                            <th>البريد الإلكتروني</th>
+                            <th>الهاتف</th>
+                            <th>عدد المستخدمين</th>
+                            <th>عدد المناطق</th>
+                            <th>الحالة</th>
+                            <th>تاريخ الإضافة</th>
+                            <th>الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for company in companies %}
+                        <tr>
+                            <td>{{ company.name }}</td>
+                            <td>{{ company.code or '-' }}</td>
+                            <td>{{ company.email or '-' }}</td>
+                            <td>{{ company.phone or '-' }}</td>
+                            <td>{{ company.users|length }}</td>
+                            <td>{{ company.locations|length }}</td>
+                            <td>
+                                <span class="badge badge-{{ 'success' if company.active else 'danger' }}">
+                                    {{ 'نشطة' if company.active else 'غير نشطة' }}
+                                </span>
+                            </td>
+                            <td>{{ company.created_at.strftime('%Y-%m-%d') }}</td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('edit_company', company_id=company.id) }}"
+                                       class="btn btn-warning" title="تعديل">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    {% if company.users|length == 0 and company.locations|length == 0 %}
+                                    <form method="post" action="{{ url_for('delete_company', company_id=company.id) }}"
+                                          class="d-inline" onsubmit="return confirm('هل أنت متأكد من حذف هذه الشركة؟');">
+                                        <button type="submit" class="btn btn-danger" title="حذف">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                    <form method="post" action="{{ url_for('toggle_company', company_id=company.id) }}"
+                                          class="d-inline toggle-form">
+                                        <button type="submit" class="btn btn-{{ 'warning' if company.active else 'success' }}"
+                                                title="{{ 'تعطيل' if company.active else 'تفعيل' }}">
+                                            <i class="fas fa-{{ 'pause' if company.active else 'play' }}"></i>
+                                        </button>
+                                    </form>
+                                    {% if company.name == 'الشركة اليمنية لتكرير السكر' %}
+                                    <form method="post" action="{{ url_for('migrate_company_data', company_id=company.id) }}"
+                                          class="d-inline" onsubmit="return confirm('سيتم نقل جميع البيانات الحالية إلى هذه الشركة. هل تريد المتابعة؟');">
+                                        <button type="submit" class="btn btn-info" title="نقل البيانات">
+                                            <i class="fas fa-exchange-alt"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="9" class="text-center">لا توجد شركات</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    // تفعيل DataTables
+    $('#dataTable').DataTable({
+        "language": {
+            "url": "//cdn.datatables.net/plug-ins/1.10.24/i18n/Arabic.json"
+        }
+    });
+
+    // تفعيل/تعطيل الشركة باستخدام AJAX
+    $('.toggle-form').on('submit', function(e) {
+        e.preventDefault();
+        var form = $(this);
+
+        $.ajax({
+            type: 'POST',
+            url: form.attr('action'),
+            success: function(response) {
+                if (response.success) {
+                    location.reload();
+                } else {
+                    alert(response.message);
+                }
+            },
+            error: function() {
+                alert('حدث خطأ أثناء معالجة الطلب');
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

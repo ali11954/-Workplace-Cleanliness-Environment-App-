@@ -28,42 +28,903 @@
         </div>
     </div>
 
-    <!-- ===================== أيقونات الواجهات العليا مع تحسينات ===================== -->
-    {% set features = [
-        {'url':'evaluations', 'icon':'fa-clipboard-check', 'text':'التقييمات', 'bg':'bg-evaluations', 'badge': total_evaluations},
-        {'url':'users', 'icon':'fa-user', 'text':'المستخدمون', 'bg':'bg-users', 'badge': users|length},
-        {'url':'authorities', 'icon':'fa-users', 'text':'الجهات', 'bg':'bg-authorities', 'badge': authorities|length},
-        {'url':'locations', 'icon':'fa-map-marker-alt', 'text':'المناطق', 'bg':'bg-locations', 'badge': total_regions},
-        {'url':'criteria', 'icon':'fa-list-check', 'text':'المعايير', 'bg':'bg-criteria', 'badge': ''},
-        {'url':'report_summary', 'icon':'fa-broom', 'text':'تقرير المناطق', 'bg':'bg-report-evaluation', 'badge': ''},
-        {'url':'reports', 'icon':'fa-file-alt', 'text':'تقرير المستخدمين', 'bg':'bg-report-general', 'badge': ''},
-        {'url':'action_plans', 'icon':'fa-tasks', 'text':'خطة عمل', 'bg':'bg-action_plans', 'badge': total_action_plans},
-        {'url':'responsibility_report', 'icon':'fa-balance-scale', 'text':'تقرير الجهات', 'bg':'bg-report-responsibility', 'badge': ''},
-        {'url':'select_user', 'icon':'fa-file-alt', 'text':'نماذج التقييم', 'bg':'bg-evaluations', 'badge': ''}
-    ] %}
-
-    <div class="features-grid">
-        {% for item in features %}
-        <a href="{{ url_for(item.url) }}" class="feature-card {{ item.bg }}" data-feature="{{ item.text }}">
-            <div class="feature-card-inner">
-                <div class="feature-icon">
-                    <i class="fas {{ item.icon }}"></i>
-                    {% if item.badge %}
-                    <span class="feature-badge">{{ item.badge }}</span>
-                    {% endif %}
-                </div>
-                <div class="feature-content">
-                    <h3>{{ item.text }}</h3>
-                    <p>إدارة {{ item.text }} في النظام</p>
-                </div>
-                <div class="feature-arrow">
-                    <i class="fas fa-arrow-left"></i>
-                </div>
+    <!-- ===================== فلتر الشركات ===================== -->
+    {% if current_user.role == 'admin' and companies_list %}
+    <div class="company-filter-section">
+        <div class="filter-card">
+            <div class="filter-header">
+                <i class="fas fa-filter"></i>
+                <h4>فلتر حسب الشركة</h4>
             </div>
-            <div class="feature-hover-effect"></div>
-        </a>
-        {% endfor %}
+            <div class="filter-body">
+                <form method="get" class="filter-form" id="companyFilterForm">
+                    <div class="form-group">
+                        <label for="companySelect">
+                            <i class="fas fa-building"></i>
+                            اختر الشركة
+                        </label>
+                        <select name="company_id" class="form-control select-style" id="companySelect" onchange="this.form.submit()">
+                            <option value="">جميع الشركات</option>
+                            {% for company in companies_list %}
+                            <option value="{{ company.id }}"
+                                {% if selected_company_id == company.id %}selected{% endif %}>
+                                {{ company.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    {% if selected_company_id and current_company %}
+                    <div class="selected-company-info">
+                        <div class="company-badge">
+                            <i class="fas fa-check-circle"></i>
+                            <span>الشركة المحددة: <strong>{{ current_company.name }}</strong></span>
+                        </div>
+                        <div class="company-stats">
+                            <span class="stat-item">
+                                <i class="fas fa-users"></i>
+                                {{ current_company.users|length }} مستخدم
+                            </span>
+                            <span class="stat-item">
+                                <i class="fas fa-map-marker-alt"></i>
+                                {{ current_company.locations|length }} منطقة
+                            </span>
+                        </div>
+                    </div>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
     </div>
+    {% endif %}
+</div>
+
+<style>
+:root {
+    --primary-color: #4CAF50;
+    --primary-light: #81C784;
+    --primary-dark: #388E3C;
+    --accent-color: #8BC34A;
+    --text-color: #333;
+    --light-bg: #F1F8E9;
+    --card-bg: #FFFFFF;
+    --shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+    background-color: var(--light-bg);
+    color: var(--text-color);
+    line-height: 1.6;
+}
+
+.main-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* تنسيقات الهيدر */
+.dashboard-header {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    color: white;
+    border-radius: 20px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--shadow);
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.dashboard-header::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 1%, transparent 1%);
+    background-size: 20px 20px;
+    transform: rotate(30deg);
+    animation: float 20s infinite linear;
+}
+
+@keyframes float {
+    0% { transform: rotate(30deg) translateX(0); }
+    100% { transform: rotate(30deg) translateX(-20px); }
+}
+
+.dashboard-title {
+    font-size: 2.2rem;
+    margin-bottom: 0.5rem;
+    position: relative;
+    z-index: 2;
+}
+
+.dashboard-subtitle {
+    font-size: 1.2rem;
+    opacity: 0.9;
+    margin-bottom: 1.5rem;
+    position: relative;
+    z-index: 2;
+}
+
+.status-bar {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    flex-wrap: wrap;
+    position: relative;
+    z-index: 2;
+}
+
+.status-item {
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0.5rem 1rem;
+    border-radius: 50px;
+    backdrop-filter: blur(5px);
+}
+
+.status-item i {
+    margin-left: 0.5rem;
+}
+
+/* ===================== تنسيقات فلتر الشركات ===================== */
+.company-filter-section {
+    margin: 2rem 0;
+    padding: 0 1rem;
+}
+
+.filter-card {
+    background: linear-gradient(135deg, var(--primary-light), var(--primary-color));
+    border-radius: 20px;
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+    border: none;
+    color: white;
+    position: relative;
+    overflow: hidden;
+}
+
+.filter-card::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 1%, transparent 1%);
+    background-size: 20px 20px;
+    transform: rotate(30deg);
+    animation: float 20s infinite linear;
+}
+
+.filter-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    position: relative;
+    z-index: 2;
+}
+
+.filter-header i {
+    font-size: 1.5rem;
+    margin-left: 0.75rem;
+    background: rgba(255,255,255,0.2);
+    padding: 0.75rem;
+    border-radius: 12px;
+}
+
+.filter-header h4 {
+    margin: 0;
+    font-weight: 600;
+    font-size: 1.3rem;
+}
+
+.filter-body {
+    position: relative;
+    z-index: 2;
+}
+
+.filter-form .form-group {
+    margin-bottom: 1rem;
+}
+
+.filter-form label {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    font-size: 0.95rem;
+}
+
+.filter-form label i {
+    margin-left: 0.5rem;
+    opacity: 0.9;
+}
+
+.select-style {
+    background: rgba(255,255,255,0.15);
+    border: 2px solid rgba(255,255,255,0.3);
+    border-radius: 12px;
+    color: white;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+    width: 100%;
+}
+
+.select-style:focus {
+    background: rgba(255,255,255,0.25);
+    border-color: rgba(255,255,255,0.5);
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.1);
+    outline: none;
+}
+
+.select-style option {
+    background: var(--primary-dark);
+    color: white;
+    padding: 0.5rem;
+}
+
+/* معلومات الشركة المحددة */
+.selected-company-info {
+    background: rgba(255,255,255,0.1);
+    border-radius: 15px;
+    padding: 1rem;
+    margin-top: 1rem;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.2);
+}
+
+.company-badge {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    font-size: 1rem;
+}
+
+.company-badge i {
+    color: #C8E6C9;
+    margin-left: 0.5rem;
+    font-size: 1.1rem;
+}
+
+.company-stats {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    background: rgba(255,255,255,0.15);
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.stat-item i {
+    margin-left: 0.3rem;
+    opacity: 0.8;
+    font-size: 0.8rem;
+}
+
+/* تنسيقات متجاوبة */
+@media (max-width: 768px) {
+    .company-filter-section {
+        margin: 1rem 0;
+        padding: 0 0.5rem;
+    }
+
+    .filter-card {
+        padding: 1rem;
+        border-radius: 15px;
+    }
+
+    .filter-header {
+        flex-direction: column;
+        text-align: center;
+        gap: 0.5rem;
+    }
+
+    .filter-header i {
+        margin-left: 0;
+    }
+
+    .company-stats {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .stat-item {
+        justify-content: center;
+    }
+
+    .status-bar {
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .dashboard-title {
+        font-size: 1.8rem;
+    }
+}
+
+/* تأثيرات hover للفلتر */
+.filter-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.filter-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+}
+
+/* تحسينات للوضع الداكن */
+@media (prefers-color-scheme: dark) {
+    body {
+        background-color: #1a1a1a;
+        color: #f0f0f0;
+    }
+
+    .filter-card {
+        background: linear-gradient(135deg, var(--primary-dark), #2E7D32);
+    }
+
+    .select-style {
+        background: rgba(255,255,255,0.1);
+    }
+
+    .selected-company-info {
+        background: rgba(255,255,255,0.05);
+    }
+
+    .stat-item {
+        background: rgba(255,255,255,0.08);
+    }
+}
+</style>
+
+<script>
+// تحديث الوقت الحي
+function updateLiveTime() {
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('liveTime').textContent = timeString;
+}
+
+// تحديث الوقت كل دقيقة
+setInterval(updateLiveTime, 60000);
+updateLiveTime();
+
+// تحسين تجربة المستخدم للفلتر
+document.addEventListener('DOMContentLoaded', function() {
+    const companySelect = document.getElementById('companySelect');
+    const filterForm = document.getElementById('companyFilterForm');
+
+    if (companySelect) {
+        // إضافة تأثير عند التغيير
+        companySelect.addEventListener('change', function() {
+            // إضافة تأثير تحميل
+            const submitBtn = document.createElement('button');
+            submitBtn.style.display = 'none';
+            submitBtn.type = 'submit';
+            filterForm.appendChild(submitBtn);
+            submitBtn.click();
+        });
+
+        // تحسين المظهر على الأجهزة المحمولة
+        if (window.innerWidth < 768) {
+            companySelect.style.fontSize = '16px'; // منع التكبير في iOS
+        }
+    }
+
+    // تأثيرات إضافية للبطاقة
+    const filterCard = document.querySelector('.filter-card');
+    if (filterCard) {
+        filterCard.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-5px) scale(1.02)';
+        });
+
+        filterCard.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(0) scale(1)';
+        });
+    }
+});
+</script>
+<!-- ===================== أيقونات الواجهات العليا مع تحسينات ===================== -->
+{% set features = [
+    {'url':'companies', 'icon':'fa-building', 'text':'الشركات', 'bg':'bg-companies', 'badge': total_companies},
+    {'url':'evaluations', 'icon':'fa-clipboard-check', 'text':'التقييمات', 'bg':'bg-evaluations', 'badge': total_evaluations},
+    {'url':'users', 'icon':'fa-user', 'text':'المستخدمون', 'bg':'bg-users', 'badge': users|length},
+    {'url':'authorities', 'icon':'fa-users', 'text':'الجهات', 'bg':'bg-authorities', 'badge': authorities|length},
+    {'url':'locations', 'icon':'fa-map-marker-alt', 'text':'المناطق', 'bg':'bg-locations', 'badge': total_regions},
+    {'url':'criteria', 'icon':'fa-list-check', 'text':'المعايير', 'bg':'bg-criteria', 'badge': ''},
+    {'url':'report_summary', 'icon':'fa-broom', 'text':'تقرير المناطق', 'bg':'bg-report-evaluation', 'badge': ''},
+    {'url':'reports', 'icon':'fa-file-alt', 'text':'تقرير المستخدمين', 'bg':'bg-report-general', 'badge': ''},
+    {'url':'action_plans', 'icon':'fa-tasks', 'text':'خطة عمل', 'bg':'bg-action_plans', 'badge': total_action_plans},
+    {'url':'responsibility_report', 'icon':'fa-balance-scale', 'text':'تقرير الجهات', 'bg':'bg-report-responsibility', 'badge': ''},
+    {'url':'select_user', 'icon':'fa-file-alt', 'text':'نماذج التقييم', 'bg':'bg-evaluations', 'badge': ''}
+] %}
+
+<div class="features-grid">
+    {% for item in features %}
+    <a href="{{ url_for(item.url) }}" class="feature-card {{ item.bg }}" data-feature="{{ item.text }}">
+        <div class="feature-card-inner">
+            <div class="feature-icon">
+                <i class="fas {{ item.icon }}"></i>
+                {% if item.badge %}
+                <span class="feature-badge">{{ item.badge }}</span>
+                {% endif %}
+            </div>
+            <div class="feature-content">
+                <h3>{{ item.text }}</h3>
+                <p>إدارة {{ item.text }} في النظام</p>
+            </div>
+            <div class="feature-arrow">
+                <i class="fas fa-arrow-left"></i>
+            </div>
+        </div>
+        <div class="feature-hover-effect"></div>
+    </a>
+    {% endfor %}
+</div>
+
+<!-- قسم الرسوم البيانية للشركات -->
+<!-- قسم الرسوم البيانية للشركات -->
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-bar me-2"></i>
+                    التقييمات اليومية والتراكمية
+                    {% if current_company %}
+                    - {{ current_company.name }}
+                    {% endif %}
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="evaluationsChart" width="400" height="250"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-success text-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-building me-2"></i>
+                    مقارنة أداء الشركات
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <select id="companyComparisonSelect" class="form-select">
+                        <option value="all">جميع الشركات</option>
+                        {% for company in companies_list %}
+                        <option value="{{ company.id }}"
+                            {% if selected_company_id == company.id %}selected{% endif %}>
+                            {{ company.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <canvas id="companiesChart" width="400" height="250"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- إحصائيات الشركات -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-info text-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-line me-2"></i>
+                    إحصائيات الشركات
+                    {% if current_company %}
+                    - {{ current_company.name }}
+                    {% endif %}
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>الشركة</th>
+                                <th>عدد التقييمات</th>
+                                <th>عدد المستخدمين</th>
+                                <th>متوسط الدرجات</th>
+                                <th>التقييمات اليومية</th>
+                                <th>الحالة</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if selected_company_id and current_company %}
+                            <!-- عرض شركة واحدة إذا تم اختيارها -->
+                            <tr class="table-primary">
+                                <td>
+                                    <i class="fas fa-building me-2"></i>
+                                    <strong>{{ current_company.name }}</strong>
+                                </td>
+                                <td>
+                                    <span class="badge bg-primary">{{ companies_stats[0].evaluation_count if companies_stats else 0 }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-success">{{ current_company.users|length }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-warning text-dark">{{ companies_stats[0].avg_score if companies_stats else 0 }}/10</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-info">{{ daily_stats.daily_evaluations }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{{ 'success' if current_company.active else 'danger' }}">
+                                        {{ 'نشطة' if current_company.active else 'غير نشطة' }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <!-- عرض جميع الشركات -->
+                            {% for company in companies_stats %}
+                            <tr>
+                                <td>
+                                    <i class="fas fa-building me-2 text-muted"></i>
+                                    {{ company.name }}
+                                </td>
+                                <td>
+                                    <span class="badge bg-primary">{{ company.evaluation_count }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-success">{{ company.user_count }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-warning text-dark">{{ company.avg_score }}/10</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-info">{{ company.daily_evaluations or 0 }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{{ 'success' if company.active else 'danger' }}">
+                                        {{ 'نشطة' if company.active else 'غير نشطة' }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- ملخص الإحصائيات -->
+                {% if not selected_company_id %}
+                <div class="row mt-3">
+                    <div class="col-md-3 col-6">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h4 class="text-primary">{{ companies_stats|sum(attribute='evaluation_count') }}</h4>
+                                <small class="text-muted">إجمالي التقييمات</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h4 class="text-success">{{ companies_stats|sum(attribute='user_count') }}</h4>
+                                <small class="text-muted">إجمالي المستخدمين</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h4 class="text-warning">
+                                    {{ "%.1f"|format((companies_stats|sum(attribute='avg_score') / (companies_stats|length)) if companies_stats else 0) }}
+                                </h4>
+                                <small class="text-muted">متوسط الدرجات</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h4 class="text-info">{{ companies_list|length }}</h4>
+                                <small class="text-muted">عدد الشركات</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// رسم بياني للتقييمات اليومية والتراكمية
+document.addEventListener('DOMContentLoaded', function() {
+    const evaluationsCtx = document.getElementById('evaluationsChart');
+    if (evaluationsCtx) {
+        new Chart(evaluationsCtx, {
+            type: 'bar',
+            data: {
+                labels: ['اليوم', 'التراكمي'],
+                datasets: [{
+                    label: 'عدد التقييمات',
+                    data: [
+                        {{ daily_stats.daily_evaluations }},
+                        {{ cumulative_stats.total_evaluations }}
+                    ],
+                    backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 2,
+                    borderRadius: 5
+                }, {
+                    label: 'متوسط الدرجات',
+                    data: [
+                        {{ daily_stats.daily_avg_score }},
+                        {{ cumulative_stats.total_avg_score }}
+                    ],
+                    type: 'line',
+                    fill: false,
+                    borderColor: 'rgba(255, 99, 132, 1)',
+                    borderWidth: 3,
+                    tension: 0.4,
+                    pointRadius: 6,
+                    pointBackgroundColor: 'rgba(255, 99, 132, 1)'
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        rtl: true
+                    },
+                    title: {
+                        display: true,
+                        text: 'مقارنة الأداء اليومي والتراكمي',
+                        font: {
+                            size: 16
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'القيمة'
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // رسم بياني لمقارنة الشركات
+    const companiesCtx = document.getElementById('companiesChart');
+    if (companiesCtx && {{ company_comparison|tojson }}) {
+        const companyComparison = {{ company_comparison|tojson }};
+
+        // إعداد بيانات الرسم البياني
+        let chartData = {
+            labels: companyComparison.date_labels || [],
+            datasets: []
+        };
+
+        // إذا كان هناك شركات للعرض
+        if (companyComparison.companies_data && companyComparison.companies_data.length > 0) {
+            companyComparison.companies_data.forEach((company, index) => {
+                const color = getCompanyColor(index);
+                chartData.datasets.push({
+                    label: company.name,
+                    data: company.daily_scores,
+                    borderColor: color,
+                    backgroundColor: color.replace('1)', '0.1)'),
+                    tension: 0.4,
+                    fill: false,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                });
+            });
+        }
+
+        new Chart(companiesCtx, {
+            type: 'line',
+            data: chartData,
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        rtl: true
+                    },
+                    title: {
+                        display: true,
+                        text: 'مقارنة أداء الشركات خلال الأيام الماضية',
+                        font: {
+                            size: 16
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.dataset.label}: ${context.raw}/10`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 10,
+                        title: {
+                            display: true,
+                            text: 'متوسط الدرجات'
+                        },
+                        ticks: {
+                            stepSize: 1
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'التاريخ'
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // التحكم في مقارنة الشركات
+    const companyComparisonSelect = document.getElementById('companyComparisonSelect');
+    if (companyComparisonSelect) {
+        companyComparisonSelect.addEventListener('change', function() {
+            const companyId = this.value;
+            if (companyId === 'all') {
+                // عرض جميع الشركات - إعادة تحميل الصفحة بدون فلتر
+                window.location.href = "{{ url_for('dashboard') }}";
+            } else {
+                // عرض شركة محددة
+                window.location.href = "{{ url_for('dashboard') }}?company_id=" + companyId;
+            }
+        });
+    }
+});
+
+// توليد ألوان متنوعة للشركات
+function getCompanyColor(index) {
+    const colors = [
+        'rgba(255, 99, 132, 1)',
+        'rgba(54, 162, 235, 1)',
+        'rgba(255, 206, 86, 1)',
+        'rgba(75, 192, 192, 1)',
+        'rgba(153, 102, 255, 1)',
+        'rgba(255, 159, 64, 1)',
+        'rgba(199, 199, 199, 1)',
+        'rgba(83, 102, 255, 1)',
+        'rgba(40, 159, 64, 1)',
+        'rgba(210, 105, 30, 1)'
+    ];
+    return colors[index % colors.length];
+}
+
+// تحديث البيانات كل 30 ثانية
+function refreshCompanyData() {
+    // يمكن إضافة AJAX call هنا لتحديث البيانات بدون إعادة تحميل الصفحة
+    console.log('جارٍ تحديث بيانات الشركات...');
+}
+
+// تحديث البيانات كل 30 ثانية
+setInterval(refreshCompanyData, 30000);
+</script>
+
+<style>
+.card {
+    border: none;
+    border-radius: 15px;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
+}
+
+.card-header {
+    border-radius: 15px 15px 0 0 !important;
+    border: none;
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+    color: #2d3748;
+}
+
+.badge {
+    font-size: 0.75em;
+    padding: 0.5em 0.75em;
+}
+
+.bg-light {
+    background-color: #f8f9fa !important;
+}
+
+/* تنسيقات متجاوبة */
+@media (max-width: 768px) {
+    .card-body {
+        padding: 1rem;
+    }
+
+    .table {
+        font-size: 0.875rem;
+    }
+
+    .badge {
+        font-size: 0.7em;
+        padding: 0.4em 0.6em;
+    }
+}
+
+/* تحسين مظهر select */
+.form-select {
+    border-radius: 10px;
+    border: 2px solid #e2e8f0;
+    transition: border-color 0.3s ease;
+}
+
+.form-select:focus {
+    border-color: #4a90e2;
+    box-shadow: 0 0 0 0.2rem rgba(74, 144, 226, 0.25);
+}
+
+/* تأثيرات للصفوف في الجدول */
+.table-hover tbody tr:hover {
+    background-color: rgba(74, 144, 226, 0.05);
+    transform: scale(1.01);
+    transition: all 0.2s ease;
+}
+
+/* تنسيق البطاقات الصغيرة */
+.card.bg-light {
+    border: 1px solid #e2e8f0;
+}
+
+.card.bg-light .card-body {
+    padding: 1rem;
+}
+
+.card.bg-light h4 {
+    margin-bottom: 0.5rem;
+    font-weight: 700;
+}
+
+.card.bg-light small {
+    font-size: 0.8rem;
+    color: #64748b;
+}
+</style>
+
 
     <!-- ===================== لوحة التحليل الذكية ===================== -->
     <div class="analytics-dashboard">
@@ -347,7 +1208,7 @@
                     <div class="kpi-value">{{ regions_evaluated }}/{{ total_regions }}</div>
                     <div class="kpi-label">نسبة تقييم المناطق</div>
                     <div class="kpi-progress">
-                        <div class="progress-bar" style="width: {{ (regions_evaluated/total_regions*100)|round|int }}%"></div>
+                        <div class="progress-bar" style="width: {{ ((regions_evaluated / total_regions * 100) if total_regions else 0)|round|int }}%"></div>
                     </div>
                 </div>
             </div>
@@ -360,7 +1221,8 @@
                     <div class="kpi-value">{{ authorities_evaluated }}/{{ total_authorities }}</div>
                     <div class="kpi-label">نسبة تقييم الجهات</div>
                     <div class="kpi-progress">
-                        <div class="progress-bar" style="width: {{ (authorities_evaluated/total_authorities*100)|round|int }}%"></div>
+                        <div class="progress-bar" style="width: {{ ((authorities_evaluated / total_authorities * 100) if total_authorities else 0)|round|int }}%"></div>
+
                     </div>
                 </div>
             </div>
@@ -1530,7 +2392,116 @@
 }
 </style>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+    // في نهاية templates/admin/dashboard.html
+{% block scripts %}
+<script>
+// تحديث الرسوم البيانية عند تغيير الشركة
+function updateChartsForCompany(companyId) {
+    if (companyId) {
+        // إعادة تحميل الصفحة بالشركة المختارة
+        window.location.href = "{{ url_for('dashboard') }}?company_id=" + companyId;
+    } else {
+        // إعادة تحميل الصفحة بدون فلتر
+        window.location.href = "{{ url_for('dashboard') }}";
+    }
+}
+
+// إضافة حدث للفلتر
+document.getElementById('companySelect')?.addEventListener('change', function() {
+    updateChartsForCompany(this.value);
+});
+
+// تحديث عناوين الرسوم البيانية بناءً على الشركة المختارة
+function updateChartTitles() {
+    const companyName = "{{ current_company.name if current_company else 'جميع الشركات' }}";
+
+    // تحديث عناوين الرسوم البيانية
+    document.querySelectorAll('.card-title').forEach(title => {
+        if (title.textContent.includes('التقييمات')) {
+            title.textContent = `التقييمات - ${companyName}`;
+        }
+    });
+}
+
+// تنفيذ عند تحميل الصفحة
+document.addEventListener('DOMContentLoaded', function() {
+    updateChartTitles();
+});
+
+{% endblock %}
+
+// رسم بياني للتقييمات اليومية والتراكمية
+const evaluationsCtx = document.getElementById('evaluationsChart').getContext('2d');
+const evaluationsChart = new Chart(evaluationsCtx, {
+    type: 'bar',
+    data: {
+        labels: ['اليوم', 'التراكمي'],
+        datasets: [{
+            label: 'عدد التقييمات',
+            data: [{{ daily_stats.daily_evaluations }}, {{ cumulative_stats.total_evaluations }}],
+            backgroundColor: 'rgba(54, 162, 235, 0.5)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 1
+        }, {
+            label: 'متوسط الدرجات',
+            data: [{{ daily_stats.daily_avg_score }}, {{ cumulative_stats.total_avg_score }}],
+            type: 'line',
+            fill: false,
+            borderColor: 'rgba(255, 99, 132, 1)',
+            tension: 0.1
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+
+// رسم بياني لمقارنة الشركات (للمشرف العام فقط)
+{% if current_user.role == 'admin' and company_comparison.companies_data %}
+const companiesCtx = document.getElementById('companiesChart').getContext('2d');
+const companiesChart = new Chart(companiesCtx, {
+    type: 'line',
+    data: {
+        labels: {{ company_comparison.date_labels | tojson }},
+        datasets: [
+            {% for company in company_comparison.companies_data %}
+            {
+                label: '{{ company.name }}',
+                data: {{ company.daily_scores | tojson }},
+                borderColor: getRandomColor(),
+                tension: 0.1,
+                fill: false
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            y: {
+                beginAtZero: true,
+                max: 10
+            }
+        }
+    }
+});
+{% endif %}
+
+function getRandomColor() {
+    const letters = '0123456789ABCDEF';
+    let color = '#';
+    for (let i = 0; i < 6; i++) {
+        color += letters[Math.floor(Math.random() * 16)];
+    }
+    return color;
+}
 // ===================== JavaScript المحسن =====================
 document.addEventListener('DOMContentLoaded', function() {
     // تحديث الوقت الحي

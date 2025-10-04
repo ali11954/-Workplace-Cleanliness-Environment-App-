@@ -2,129 +2,416 @@
 {% block title %}{% if form.fullname.data %}تعديل مستخدم{% else %}إضافة مستخدم{% endif %}{% endblock %}
 
 {% block content %}
-<h2 class="mb-4">{% if form.fullname.data %}تعديل مستخدم{% else %}إضافة مستخدم{% endif %}</h2>
-
-<form method="POST" novalidate class="p-4 border rounded shadow-sm bg-light">
-    {{ form.hidden_tag() }}
-
-    <!-- الاسم الكامل -->
-    <div class="mb-3">
-        {{ form.fullname.label(class="form-label fw-bold") }}
-        {{ form.fullname(class="form-control", placeholder="الاسم الكامل") }}
-        {% for error in form.fullname.errors %}
-            <div class="text-danger small">{{ error }}</div>
-        {% endfor %}
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">{% if form.fullname.data %}تعديل مستخدم{% else %}إضافة مستخدم{% endif %}</h1>
+        <a href="{{ url_for('users') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left fa-sm"></i> رجوع إلى قائمة المستخدمين
+        </a>
     </div>
 
-    <!-- اسم المستخدم -->
-    <div class="mb-3">
-        {{ form.username.label(class="form-label fw-bold") }}
-        {{ form.username(class="form-control", placeholder="اسم المستخدم") }}
-        {% for error in form.username.errors %}
-            <div class="text-danger small">{{ error }}</div>
-        {% endfor %}
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">بيانات المستخدم</h6>
+                </div>
+                <div class="card-body">
+                    <form method="POST" novalidate>
+                        {{ form.hidden_tag() }}
+
+                        <div class="row">
+                            <!-- الاسم الكامل -->
+                            <div class="col-md-6 mb-3">
+                                {{ form.fullname.label(class="form-label fw-bold") }}
+                                {{ form.fullname(class="form-control", placeholder="الاسم الكامل") }}
+                                {% for error in form.fullname.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+
+                            <!-- اسم المستخدم -->
+                            <div class="col-md-6 mb-3">
+                                {{ form.username.label(class="form-label fw-bold") }}
+                                {{ form.username(class="form-control", placeholder="اسم المستخدم") }}
+                                {% for error in form.username.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- البريد الإلكتروني -->
+                        <div class="mb-3">
+                            {{ form.email.label(class="form-label fw-bold") }}
+                            {{ form.email(class="form-control", placeholder="البريد الإلكتروني") }}
+                            {% for error in form.email.errors %}
+                                <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                        <!-- الشركة -->
+                        <div class="mb-3">
+                            {{ form.company_id.label(class="form-label fw-bold") }}
+                            {{ form.company_id(class="form-select") }}
+                            {% for error in form.company_id.errors %}
+                                <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="row">
+                            <!-- كلمة المرور -->
+                            <div class="col-md-6 mb-3">
+                                {{ form.password.label(class="form-label fw-bold") }}
+                                {{ form.password(class="form-control", placeholder="كلمة المرور") }}
+                                <small class="text-muted">{% if selected_user_id %}اتركه فارغاً إذا لم ترد تغيير كلمة المرور{% else %}كلمة المرور مطلوبة{% endif %}</small>
+                                {% for error in form.password.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+
+                            <!-- تأكيد كلمة المرور -->
+                            <div class="col-md-6 mb-3">
+                                {{ form.password_confirm.label(class="form-label fw-bold") }}
+                                {{ form.password_confirm(class="form-control", placeholder="تأكيد كلمة المرور") }}
+                                {% for error in form.password_confirm.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <!-- الدور -->
+                            <div class="col-md-6 mb-3">
+                                {{ form.role.label(class="form-label fw-bold") }}
+                                {{ form.role(class="form-select") }}
+                                {% for error in form.role.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+
+                            <!-- حالة المستخدم -->
+                            <div class="col-md-6 mb-3">
+                                {{ form.active.label(class="form-label fw-bold") }}
+                                {{ form.active(class="form-select") }}
+                                {% for error in form.active.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- المناطق المسؤول عنها -->
+                        <div class="mb-3">
+                            <label for="region_ids" class="form-label fw-bold">المناطق المسؤول عنها</label>
+                            <select name="region_ids" id="region_ids" class="form-select" multiple size="6">
+                                {% for region in regions %}
+                                    <option value="{{ region.id }}"
+                                        data-company="{{ region.company_id }}"
+                                        {% if form.region_ids.data and region.id in form.region_ids.data %}selected{% endif %}>
+                                        {{ region.name }} - {{ region.company.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">يمكنك اختيار أكثر من منطقة بالضغط على Ctrl (أو Cmd) أثناء التحديد</small>
+                        </div>
+
+                        <!-- أزرار الحفظ والإلغاء -->
+                        <div class="mb-3">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> {{ form.submit.label.text }}
+                            </button>
+                            <a href="{{ url_for('users') }}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> إلغاء
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <!-- معلومات إضافية -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">معلومات مهمة</h6>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <h6><i class="fas fa-info-circle"></i> ملاحظات:</h6>
+                        <ul class="mb-0">
+                            <li>اسم المستخدم يجب أن يكون فريداً</li>
+                            <li>كلمة المرور يجب أن تكون 6 أحرف على الأقل</li>
+                            <li>المستخدم العادي يمكنه الوصول فقط للمناطق المخصصة له</li>
+                            <li>المشرف يمكنه الوصول لجميع المناطق</li>
+                            <li>اختر الشركة أولاً ثم اختر المناطق التابعة لها</li>
+                        </ul>
+                    </div>
+
+                    {% if selected_user_id %}
+                    <div class="alert alert-warning">
+                        <h6><i class="fas fa-exclamation-triangle"></i> تنبيه:</h6>
+                        <p class="mb-0">اترك حقل كلمة المرور فارغاً إذا لم ترد تغييرها</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- معاينة المناطق المختارة -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">المناطق المختارة</h6>
+                </div>
+                <div class="card-body">
+                    <div id="selectedRegionsPreview" class="selected-regions-preview">
+                        <p class="text-muted">لم يتم اختيار أي مناطق بعد</p>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-<!-- البريد الإلكتروني -->
-<div class="mb-3">
-    {{ form.email.label(class="form-label fw-bold") }}
-    {{ form.email(class="form-control", placeholder="البريد الإلكتروني") }}
-    {% for error in form.email.errors %}
-        <div class="text-danger small">{{ error }}</div>
-    {% endfor %}
 </div>
-
-    <!-- كلمة المرور -->
-    <div class="mb-3">
-        {{ form.password.label(class="form-label fw-bold") }}
-        {{ form.password(class="form-control", placeholder="كلمة المرور") }}
-        {% for error in form.password.errors %}
-            <div class="text-danger small">{{ error }}</div>
-        {% endfor %}
-    </div>
-
-    <!-- تأكيد كلمة المرور -->
-    <div class="mb-3">
-        {{ form.password_confirm.label(class="form-label fw-bold") }}
-        {{ form.password_confirm(class="form-control", placeholder="تأكيد كلمة المرور") }}
-        {% for error in form.password_confirm.errors %}
-            <div class="text-danger small">{{ error }}</div>
-        {% endfor %}
-    </div>
-
-    <!-- اختيار المنطقة -->
-    <div class="mb-3">
-        <label for="region_id" class="form-label fw-bold">اختر المنطقة</label>
-       <select id="region_ids" name="region_ids" class="form-select shadow-sm" multiple required>
-    {% for region in regions %}
-        <option value="{{ region.id }}"
-            {% if region.id in form.region_ids.data %}selected{% endif %}
-        >{{ region.name }}</option>
-    {% endfor %}
-</select>
-<small class="text-muted">يمكنك اختيار أكثر من منطقة بالضغط على Ctrl (أو Cmd) أثناء التحديد</small>
-
-    </div>
-
-    <!-- اختيار المستخدم بناءً على المنطقة -->
-    <div class="mb-3">
-        <label for="user_id" class="form-label fw-bold">اختر المستخدم</label>
-        <select id="user_id" name="user_id" class="form-select shadow-sm" required>
-            <option value="">-- اختر المستخدم --</option>
-            {% for u in users %}
-                <option value="{{ u.id }}" data-region="{{ u.region_id }}"
-                 {% if selected_user_id == u.id %}selected{% endif %}
-
-                    {{ u.fullname }}
-                </option>
-            {% endfor %}
-        </select>
-    </div>
-
-    <!-- الصلاحية -->
-    <div class="mb-3">
-        {{ form.role.label(class="form-label fw-bold") }}
-        {{ form.role(class="form-select shadow-sm") }}
-    </div>
-
-    <!-- حالة المستخدم -->
-    <div class="mb-3">
-        {{ form.active.label(class="form-label fw-bold") }}
-        {{ form.active(class="form-select shadow-sm") }}
-    </div>
-
-    <!-- أزرار الحفظ والإلغاء -->
-    <div class="mb-3">
-        <button type="submit" class="btn btn-primary shadow-sm">{{ form.submit.label.text }}</button>
-        <a href="{{ url_for('users') }}" class="btn btn-secondary shadow-sm">إلغاء</a>
-    </div>
-</form>
-
 {% endblock %}
 
 {% block scripts %}
 <script>
-function filterUsers() {
-    const regionSelect = document.getElementById('region_id');
-    const userSelect = document.getElementById('user_id');
-    const selectedRegion = regionSelect.value;
+document.addEventListener('DOMContentLoaded', function() {
+    const companySelect = document.getElementById('company_id');
+    const regionSelect = document.getElementById('region_ids');
+    const previewDiv = document.getElementById('selectedRegionsPreview');
 
-    for (let option of userSelect.options) {
-        if (!option.value) continue;
-        // إظهار الخيارات المتوافقة فقط
-        option.style.display = (option.dataset.region == selectedRegion) ? 'block' : 'none';
+    // دالة لعرض المناطق المختارة
+    function updateSelectedRegionsPreview() {
+        const selectedOptions = Array.from(regionSelect.selectedOptions);
+
+        if (selectedOptions.length === 0) {
+            previewDiv.innerHTML = '<p class="text-muted">لم يتم اختيار أي مناطق بعد</p>';
+            return;
+        }
+
+        let html = '<div class="selected-regions-list">';
+        selectedOptions.forEach(option => {
+            html += `<div class="selected-region-item">
+                        <i class="fas fa-map-marker-alt text-success me-2"></i>
+                        <span>${option.text}</span>
+                    </div>`;
+        });
+        html += `<div class="mt-2 text-success">
+                    <i class="fas fa-check-circle"></i>
+                    <small>تم اختيار ${selectedOptions.length} منطقة</small>
+                 </div>`;
+        html += '</div>';
+
+        previewDiv.innerHTML = html;
     }
 
-    // إذا كان هناك مستخدم محدد مسبقًا، احتفظ به
-   const selectedUser = "{{ selected_user_id or '' }}";
+    // دالة لفلترة المناطق بناءً على الشركة
+    function filterRegionsByCompany() {
+        const companyId = companySelect ? companySelect.value : null;
+        const regions = regionSelect.options;
 
-    if (selectedUser) {
-        userSelect.value = selectedUser;
-    } else {
-        userSelect.value = "";
+        let visibleCount = 0;
+
+        for (let option of regions) {
+            if (!option.value) continue;
+
+            const regionCompanyId = option.getAttribute('data-company');
+            const shouldShow = !companyId || regionCompanyId === companyId;
+
+            option.style.display = shouldShow ? 'block' : 'none';
+            option.disabled = !shouldShow;
+
+            if (shouldShow) {
+                visibleCount++;
+            }
+        }
+
+        // إذا لم يتم اختيار شركة، عرض جميع المناطق
+        if (!companyId) {
+            for (let option of regions) {
+                option.style.display = 'block';
+                option.disabled = false;
+            }
+            visibleCount = regions.length - 1; // ناقص option الفارغ إذا كان موجوداً
+        }
+
+        // تحديث المعاينة
+        updateSelectedRegionsPreview();
+
+        // إذا كانت هناك منطقة مختارة لا تنتمي للشركة المحددة، إلغاء تحديدها
+        if (companyId) {
+            const selectedOptions = Array.from(regionSelect.selectedOptions);
+            selectedOptions.forEach(option => {
+                const regionCompanyId = option.getAttribute('data-company');
+                if (regionCompanyId !== companyId) {
+                    option.selected = false;
+                }
+            });
+            updateSelectedRegionsPreview();
+        }
     }
+
+    // إضافة event listeners
+    if (companySelect) {
+        companySelect.addEventListener('change', filterRegionsByCompany);
+    }
+
+    regionSelect.addEventListener('change', updateSelectedRegionsPreview);
+
+    // التنفيذ الأولي
+    filterRegionsByCompany();
+    updateSelectedRegionsPreview();
+
+    // تحسين تجربة المستخدم على الأجهزة المحمولة
+    if (window.innerWidth < 768) {
+        regionSelect.size = 4;
+    }
+
+    // إضافة تأثيرات للعناصر
+    const formInputs = document.querySelectorAll('.form-control, .form-select');
+    formInputs.forEach(input => {
+        input.addEventListener('focus', function() {
+            this.classList.add('shadow-sm', 'border-primary');
+        });
+
+        input.addEventListener('blur', function() {
+            this.classList.remove('shadow-sm', 'border-primary');
+        });
+    });
+
+    // إضافة search للمناطق إذا كانت كثيرة
+    if (regionSelect.options.length > 10) {
+        const searchDiv = document.createElement('div');
+        searchDiv.className = 'mb-2';
+        searchDiv.innerHTML = `
+            <input type="text" id="regionSearch" class="form-control form-control-sm" placeholder="ابحث في المناطق...">
+        `;
+        regionSelect.parentNode.insertBefore(searchDiv, regionSelect);
+
+        const searchInput = document.getElementById('regionSearch');
+        searchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const regions = regionSelect.options;
+
+            for (let option of regions) {
+                if (!option.value) continue;
+
+                const regionText = option.text.toLowerCase();
+                const isVisible = regionText.includes(searchTerm) && option.style.display !== 'none';
+
+                option.style.display = isVisible ? 'block' : 'none';
+            }
+        });
+    }
+});
+
+// التحقق من كلمة المرور
+document.querySelector('form').addEventListener('submit', function(e) {
+    const password = document.getElementById('password').value;
+    const passwordConfirm = document.getElementById('password_confirm').value;
+    const isEditMode = {{ 'true' if selected_user_id else 'false' }};
+    const regionSelect = document.getElementById('region_ids');
+    const selectedRegions = Array.from(regionSelect.selectedOptions);
+
+    // التحقق من اختيار منطقة واحدة على الأقل
+    if (selectedRegions.length === 0) {
+        e.preventDefault();
+        alert('يجب اختيار منطقة واحدة على الأقل');
+        regionSelect.focus();
+        return false;
+    }
+
+    // إذا كان وضع التعديل وكلمة المرور فارغة، تخطي التحقق
+    if (isEditMode && !password) {
+        return true;
+    }
+
+    // التحقق من كلمة المرور
+    if (password !== passwordConfirm) {
+        e.preventDefault();
+        alert('كلمتا المرور غير متطابقتين');
+        return false;
+    }
+
+    if (password.length < 6 && !(isEditMode && !password)) {
+        e.preventDefault();
+        alert('كلمة المرور يجب أن تكون 6 أحرف على الأقل');
+        return false;
+    }
+});
+</script>
+
+<style>
+.form-control:focus, .form-select:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
 }
 
-// تنفيذ الفلترة عند تحميل الصفحة
-window.addEventListener('DOMContentLoaded', filterUsers);
-</script>
+.card {
+    border: none;
+    border-radius: 15px;
+}
+
+.card-header {
+    border-radius: 15px 15px 0 0 !important;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    border-radius: 10px;
+}
+
+.btn-secondary {
+    border-radius: 10px;
+}
+
+.alert {
+    border-radius: 10px;
+    border: none;
+}
+
+.border.rounded {
+    border-radius: 10px !important;
+}
+
+.selected-regions-preview {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.selected-region-item {
+    padding: 8px 12px;
+    margin-bottom: 5px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-right: 3px solid #28a745;
+}
+
+.selected-regions-list {
+    font-size: 0.9rem;
+}
+
+/* تنسيق خيارات المناطق */
+#region_ids option {
+    padding: 8px 12px;
+    margin: 2px 0;
+    border-radius: 4px;
+}
+
+#region_ids option:hover {
+    background: #e9ecef;
+}
+
+#region_ids option:checked {
+    background: #667eea;
+    color: white;
+}
+
+/* شريط البحث */
+#regionSearch {
+    border-radius: 20px;
+    padding: 8px 15px;
+}
+</style>
 {% endblock %}

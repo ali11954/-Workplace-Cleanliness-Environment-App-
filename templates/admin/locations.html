@@ -2,14 +2,26 @@
 {% block title %}إدارة المناطق والمواقع والأماكن{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <h2 class="mb-4 text-center text-primary fw-bold">إدارة المناطق والمواقع والأماكن</h2>
+<div class="container-fluid">
+    <!-- رأس الصفحة -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">إدارة الهيكل التنظيمي</h1>
+        <div class="btn-group">
+            <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#formsSection">
+                <i class="fas fa-plus fa-sm"></i> إضافة جديد
+            </button>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left fa-sm"></i> رجوع
+            </a>
+        </div>
+    </div>
 
     <!-- رسائل الفلاش -->
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         {% for category, message in messages %}
-          <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm" role="alert">
+          <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm mb-4" role="alert">
+            <i class="fas fa-{% if category == 'success' %}check-circle{% else %}exclamation-triangle{% endif %} me-2"></i>
             {{ message }}
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
           </div>
@@ -17,147 +29,459 @@
       {% endif %}
     {% endwith %}
 
-    <!-- النماذج -->
-    <div class="row mb-5">
-        <!-- إضافة منطقة -->
-        <div class="col-md-4 mb-4">
-            <div class="card shadow-sm border-0" style="background-color:#e9f7ef; border-left:5px solid #28a745;">
-                <div class="card-header fw-bold" style="background-color:#28a745; color:white;">➕ إضافة منطقة جديدة</div>
+    <!-- إحصائيات الشركات -->
+    {% if companies_stats %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-chart-bar me-2"></i>إحصائيات الهيكل التنظيمي
+                    </h6>
+                </div>
                 <div class="card-body">
-                    <form method="post">
-                        {{ form_region.hidden_tag() }}
-                        <div class="mb-3">
-                            {{ form_region.name.label(class="form-label") }}
-                            {{ form_region.name(class="form-control shadow-sm", placeholder="اسم المنطقة") }}
+                    <div class="row">
+                        {% for stat in companies_stats %}
+                        <div class="col-xl-3 col-md-6 mb-4">
+                            <div class="card border-left-{{ ['primary','success','info','warning']|random }} shadow h-100 py-2">
+                                <div class="card-body">
+                                    <div class="row no-gutters align-items-center">
+                                        <div class="col mr-2">
+                                            <div class="text-xs font-weight-bold text-{{ ['primary','success','info','warning']|random }} text-uppercase mb-1">
+                                                {{ stat.company.name }}
+                                            </div>
+                                            <div class="row no-gutters align-items-center">
+                                                <div class="col-auto">
+                                                    <div class="h5 mb-0 mr-3 font-weight-bold text-gray-800">
+                                                        {{ stat.locations_count }} منطقة
+                                                    </div>
+                                                </div>
+                                                <div class="col">
+                                                    <div class="progress progress-sm mr-2">
+                                                        <div class="progress-bar bg-{{ ['primary','success','info','warning']|random }}"
+                                                             style="width: {{ (stat.locations_count / (locations|length or 1)) * 100 }}%"></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="mt-2 text-xs">
+                                                <span class="text-success">
+                                                    <i class="fas fa-map-marker-alt"></i> {{ stat.sites_count }} موقع
+                                                </span>
+                                                <span class="text-info mx-2">|</span>
+                                                <span class="text-warning">
+                                                    <i class="fas fa-building"></i> {{ stat.places_count }} مكان
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="col-auto">
+                                            <i class="fas fa-building fa-2x text-gray-300"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <button type="submit" name="submit_region" class="btn btn-success w-100">إضافة المنطقة</button>
-                    </form>
+                        {% endfor %}
+                    </div>
                 </div>
             </div>
         </div>
+    </div>
+    {% endif %}
 
-        <!-- إضافة موقع -->
-        <div class="col-md-4 mb-4">
-            <div class="card shadow-sm border-0" style="background-color:#e9f7ef; border-left:5px solid #28a745;">
-                <div class="card-header fw-bold" style="background-color:#28a745; color:white;">➕ إضافة موقع جديد</div>
-                <div class="card-body">
-                    <form method="post">
-                        {{ form_site.hidden_tag() }}
-                        <div class="mb-3">
-                            {{ form_site.name.label(class="form-label") }}
-                            {{ form_site.name(class="form-control shadow-sm", placeholder="اسم الموقع") }}
-                        </div>
-                        <div class="mb-3">
-                            {{ form_site.region_id.label(class="form-label") }}
-                            {{ form_site.region_id(class="form-select shadow-sm") }}
-                        </div>
-                        <button type="submit" name="submit_site" class="btn btn-success w-100">إضافة الموقع</button>
-                    </form>
-                </div>
+    <!-- نماذج الإضافة -->
+    <div class="collapse mb-4" id="formsSection">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-plus-circle me-2"></i>إضافة عناصر جديدة
+                </h6>
             </div>
-        </div>
+            <div class="card-body">
+                <div class="row">
+                    <!-- إضافة منطقة -->
+                    <div class="col-lg-4 mb-4">
+                        <div class="card border-left-primary shadow h-100">
+                            <div class="card-header py-3">
+                                <h6 class="m-0 font-weight-bold text-primary">
+                                    <i class="fas fa-map-marker-alt me-2"></i>إضافة منطقة جديدة
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <form method="post">
+                                    {{ form_region.hidden_tag() }}
+                                    <div class="mb-3">
+                                        {{ form_region.name.label(class="form-label fw-bold") }}
+                                        {{ form_region.name(class="form-control", placeholder="أدخل اسم المنطقة") }}
+                                        {% for error in form_region.name.errors %}
+                                        <div class="text-danger small">{{ error }}</div>
+                                        {% endfor %}
+                                    </div>
+                                    <div class="mb-3">
+                                        {{ form_region.company_id.label(class="form-label fw-bold") }}
+                                        {{ form_region.company_id(class="form-select") }}
+                                        {% for error in form_region.company_id.errors %}
+                                        <div class="text-danger small">{{ error }}</div>
+                                        {% endfor %}
+                                    </div>
+                                    <button type="submit" name="submit_region" class="btn btn-primary w-100">
+                                        <i class="fas fa-save me-2"></i>إضافة المنطقة
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
 
-        <!-- إضافة مكان -->
-        <div class="col-md-4 mb-4">
-            <div class="card shadow-sm border-0" style="background-color:#fff3e6; border-left:5px solid #28a745;">
-                <div class="card-header fw-bold" style="background-color:#28a745; color:white;">➕ إضافة مكان جديد</div>
-                <div class="card-body">
-                    <form method="post">
-                        {{ form_place.hidden_tag() }}
-                        <div class="mb-3">
-                            {{ form_place.name.label(class="form-label") }}
-                            {{ form_place.name(class="form-control shadow-sm", placeholder="اسم المكان") }}
+                    <!-- إضافة موقع -->
+                    <div class="col-lg-4 mb-4">
+                        <div class="card border-left-success shadow h-100">
+                            <div class="card-header py-3">
+                                <h6 class="m-0 font-weight-bold text-success">
+                                    <i class="fas fa-location-arrow me-2"></i>إضافة موقع جديد
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <form method="post">
+                                    {{ form_site.hidden_tag() }}
+                                    <div class="mb-3">
+                                        {{ form_site.name.label(class="form-label fw-bold") }}
+                                        {{ form_site.name(class="form-control", placeholder="أدخل اسم الموقع") }}
+                                        {% for error in form_site.name.errors %}
+                                        <div class="text-danger small">{{ error }}</div>
+                                        {% endfor %}
+                                    </div>
+                                    <div class="mb-3">
+                                        {{ form_site.region_id.label(class="form-label fw-bold") }}
+                                        {{ form_site.region_id(class="form-select") }}
+                                        {% for error in form_site.region_id.errors %}
+                                        <div class="text-danger small">{{ error }}</div>
+                                        {% endfor %}
+                                    </div>
+                                    <button type="submit" name="submit_site" class="btn btn-success w-100">
+                                        <i class="fas fa-save me-2"></i>إضافة الموقع
+                                    </button>
+                                </form>
+                            </div>
                         </div>
-                        <div class="mb-3">
-                            {{ form_place.site_id.label(class="form-label") }}
-                            {{ form_place.site_id(class="form-select shadow-sm") }}
+                    </div>
+
+                    <!-- إضافة مكان -->
+                    <div class="col-lg-4 mb-4">
+                        <div class="card border-left-warning shadow h-100">
+                            <div class="card-header py-3">
+                                <h6 class="m-0 font-weight-bold text-warning">
+                                    <i class="fas fa-building me-2"></i>إضافة مكان جديد
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <form method="post">
+                                    {{ form_place.hidden_tag() }}
+                                    <div class="mb-3">
+                                        {{ form_place.name.label(class="form-label fw-bold") }}
+                                        {{ form_place.name(class="form-control", placeholder="أدخل اسم المكان") }}
+                                        {% for error in form_place.name.errors %}
+                                        <div class="text-danger small">{{ error }}</div>
+                                        {% endfor %}
+                                    </div>
+                                    <div class="mb-3">
+                                        {{ form_place.site_id.label(class="form-label fw-bold") }}
+                                        {{ form_place.site_id(class="form-select") }}
+                                        {% for error in form_place.site_id.errors %}
+                                        <div class="text-danger small">{{ error }}</div>
+                                        {% endfor %}
+                                    </div>
+                                    <button type="submit" name="submit_place" class="btn btn-warning w-100">
+                                        <i class="fas fa-save me-2"></i>إضافة المكان
+                                    </button>
+                                </form>
+                            </div>
                         </div>
-                        <button type="submit" name="submit_place" class="btn btn-success w-100">إضافة المكان</button>
-                    </form>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- الهيكل الحالي -->
-    <h3 class="mb-4 text-secondary">🏗️ الهيكل الحالي للمناطق والمواقع والأماكن</h3>
-
-    {% if locations %}
-        <div class="row g-4">
-        {% for location in locations %}
-            <div class="col-md-12">
-                <div class="card shadow border-0" style="background-color:#e9f7ef; border-left:5px solid #28a745;">
-                    <div class="card-header fw-bold" style="background-color:#28a745; color:white;">
-                        🌍 {{ location.name }}
-                    </div>
-                    <div class="card-body">
-                        <!-- تعديل وحذف المنطقة -->
-                        <div class="mb-3 d-flex gap-2 flex-wrap align-items-start">
-                            <form method="POST" action="{{ url_for('edit_location', location_id=location.id) }}" class="flex-grow-1 d-flex gap-2">
-                                <input type="text" name="new_name" class="form-control shadow-sm" value="{{ location.name }}" required>
-                                <button type="submit" class="btn btn-sm btn-success">✏️ تعديل</button>
-                                <button type="submit" formaction="{{ url_for('delete_location', location_id=location.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('هل أنت متأكد من حذف المنطقة؟');">🗑️ حذف</button>
-                            </form>
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">
+                <i class="fas fa-sitemap me-2"></i>الهيكل التنظيمي الحالي
+            </h6>
+            <span class="badge bg-primary">{{ locations|length }} منطقة</span>
+        </div>
+        <div class="card-body">
+            {% if locations %}
+            <div class="row">
+                {% for location in locations %}
+                <div class="col-lg-6 mb-4">
+                    <div class="card location-card shadow-sm border-left-{{ ['primary','success','info','warning']|random }}">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="m-0 font-weight-bold text-{{ ['primary','success','info','warning']|random }}">
+                                <i class="fas fa-map-marker-alt me-2"></i>{{ location.name }}
+                            </h6>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-{{ ['primary','success','info','warning']|random }} dropdown-toggle"
+                                        type="button" data-bs-toggle="dropdown">
+                                    <i class="fas fa-cog"></i>
+                                </button>
+                                <ul class="dropdown-menu">
+                                    <li>
+                                        <form method="POST" action="{{ url_for('edit_location', location_id=location.id) }}"
+                                              class="dropdown-item p-0">
+                                            <div class="input-group input-group-sm">
+                                                <input type="text" name="new_name" class="form-control" value="{{ location.name }}" required>
+                                                <select name="company_id" class="form-select form-select-sm">
+                                                    {% for company in companies %}
+                                                    <option value="{{ company.id }}"
+                                                        {% if location.company_id == company.id %}selected{% endif %}>
+                                                        {{ company.name }}
+                                                    </option>
+                                                    {% endfor %}
+                                                </select>
+                                                <button type="submit" class="btn btn-success btn-sm">
+                                                    <i class="fas fa-check"></i>
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <form method="POST" action="{{ url_for('delete_location', location_id=location.id) }}"
+                                              onsubmit="return confirm('هل أنت متأكد من حذف المنطقة {{ location.name }}؟');">
+                                            <button type="submit" class="dropdown-item text-danger">
+                                                <i class="fas fa-trash me-2"></i>حذف المنطقة
+                                            </button>
+                                        </form>
+                                    </li>
+                                </ul>
+                            </div>
                         </div>
+                        <div class="card-body">
+                            <div class="location-info mb-3">
+                                <small class="text-muted">
+                                    <i class="fas fa-building me-1"></i>الشركة: {{ location.company.name }}
+                                </small>
+                                <span class="badge bg-secondary ms-2">{{ location.sites|length }} مواقع</span>
+                            </div>
 
-                        {% if location.sites %}
-                        <div class="row g-3 mt-3">
-                            {% for site in location.sites %}
-                            <div class="col-md-6">
-                                <div class="card border-success shadow-sm h-100" style="background-color:#d4edda;">
-                                    <div class="card-header fw-bold" style="background-color:#28a745; color:white;">
-                                        📌 {{ site.name }}
+                            {% if location.sites %}
+                            <div class="sites-container">
+                                {% for site in location.sites %}
+                                <div class="card site-card mb-3 border-left-{{ ['success','info','warning','primary']|random }}">
+                                    <div class="card-header py-2 d-flex justify-content-between align-items-center">
+                                        <h6 class="m-0">
+                                            <i class="fas fa-location-arrow me-2"></i>{{ site.name }}
+                                        </h6>
+                                        <div class="dropdown">
+                                            <button class="btn btn-sm btn-outline-{{ ['success','info','warning','primary']|random }} dropdown-toggle"
+                                                    type="button" data-bs-toggle="dropdown">
+                                                <i class="fas fa-cog"></i>
+                                            </button>
+                                            <ul class="dropdown-menu">
+                                                <li>
+                                                    <form method="POST" action="{{ url_for('edit_site', site_id=site.id) }}"
+                                                          class="dropdown-item p-0">
+                                                        <div class="input-group input-group-sm">
+                                                            <input type="text" name="new_name" class="form-control" value="{{ site.name }}" required>
+                                                            <button type="submit" class="btn btn-success btn-sm">
+                                                                <i class="fas fa-check"></i>
+                                                            </button>
+                                                        </div>
+                                                    </form>
+                                                </li>
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li>
+                                                    <form method="POST" action="{{ url_for('delete_site', site_id=site.id) }}"
+                                                          onsubmit="return confirm('هل أنت متأكد من حذف الموقع {{ site.name }}؟');">
+                                                        <button type="submit" class="dropdown-item text-danger">
+                                                            <i class="fas fa-trash me-2"></i>حذف الموقع
+                                                        </button>
+                                                    </form>
+                                                </li>
+                                            </ul>
+                                        </div>
                                     </div>
                                     <div class="card-body">
-                                        <div class="mb-2 d-flex gap-2 flex-wrap align-items-start">
-                                            <form method="POST" action="{{ url_for('edit_site', site_id=site.id) }}" class="flex-grow-1 d-flex gap-2">
-                                                <input type="text" name="new_name" class="form-control shadow-sm" value="{{ site.name }}" required>
-                                                <button type="submit" class="btn btn-sm btn-success">✏️ تعديل</button>
-                                                <button type="submit" formaction="{{ url_for('delete_site', site_id=site.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('هل أنت متأكد من حذف الموقع؟');">🗑️ حذف</button>
-                                            </form>
-                                        </div>
+                                        <span class="badge bg-light text-dark">{{ site.places|length }} أماكن</span>
 
                                         {% if site.places %}
-                                        <div class="row g-2 mt-2">
+                                        <div class="places-container mt-2">
                                             {% for place in site.places %}
-                                            <div class="col-md-12">
-                                                <div class="card border-warning shadow-sm" style="background-color:#fff3e6;">
-                                                    <div class="card-header fw-bold text-dark" style="background-color:#28a745; color:white;">
-                                                        🏠 {{ place.name }}
-                                                    </div>
-                                                    <div class="card-body d-flex gap-2 flex-wrap align-items-start">
-                                                        <form method="POST" action="{{ url_for('edit_place', place_id=place.id) }}" class="flex-grow-1 d-flex gap-2">
-                                                            <input type="text" name="new_name" class="form-control shadow-sm" value="{{ place.name }}" required>
-                                                            <button type="submit" class="btn btn-sm btn-success">✏️ تعديل</button>
-                                                            <button type="submit" formaction="{{ url_for('delete_place', place_id=place.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('هل أنت متأكد من حذف المكان؟');">🗑️ حذف</button>
-                                                        </form>
+                                            <div class="card place-card mb-2 border-left-{{ ['warning','info','success','primary']|random }}">
+                                                <div class="card-body py-2 d-flex justify-content-between align-items-center">
+                                                    <span>
+                                                        <i class="fas fa-building me-2"></i>{{ place.name }}
+                                                    </span>
+                                                    <div class="dropdown">
+                                                        <button class="btn btn-sm btn-outline-{{ ['warning','info','success','primary']|random }} dropdown-toggle"
+                                                                type="button" data-bs-toggle="dropdown">
+                                                            <i class="fas fa-cog"></i>
+                                                        </button>
+                                                        <ul class="dropdown-menu">
+                                                            <li>
+                                                                <form method="POST" action="{{ url_for('edit_place', place_id=place.id) }}"
+                                                                      class="dropdown-item p-0">
+                                                                    <div class="input-group input-group-sm">
+                                                                        <input type="text" name="new_name" class="form-control" value="{{ place.name }}" required>
+                                                                        <button type="submit" class="btn btn-success btn-sm">
+                                                                            <i class="fas fa-check"></i>
+                                                                        </button>
+                                                                    </div>
+                                                                </form>
+                                                            </li>
+                                                            <li><hr class="dropdown-divider"></li>
+                                                            <li>
+                                                                <form method="POST" action="{{ url_for('delete_place', place_id=place.id) }}"
+                                                                      onsubmit="return confirm('هل أنت متأكد من حذف المكان {{ place.name }}؟');">
+                                                                    <button type="submit" class="dropdown-item text-danger">
+                                                                        <i class="fas fa-trash me-2"></i>حذف المكان
+                                                                    </button>
+                                                                </form>
+                                                            </li>
+                                                        </ul>
                                                     </div>
                                                 </div>
                                             </div>
                                             {% endfor %}
                                         </div>
+                                        {% else %}
+                                        <p class="text-muted small mb-0">لا توجد أماكن في هذا الموقع</p>
                                         {% endif %}
-
                                     </div>
                                 </div>
+                                {% endfor %}
                             </div>
-                            {% endfor %}
+                            {% else %}
+                            <p class="text-muted small mb-0">لا توجد مواقع في هذه المنطقة</p>
+                            {% endif %}
                         </div>
-                        {% else %}
-                        <p class="text-muted">لا يوجد مواقع في هذه المنطقة.</p>
-                        {% endif %}
-
                     </div>
                 </div>
+                {% endfor %}
             </div>
-        {% endfor %}
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-map-marker-alt fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">لا توجد مناطق مضافة بعد</h5>
+                <p class="text-muted">استخدم نماذج الإضافة أعلاه لبدء إنشاء الهيكل التنظيمي</p>
+            </div>
+            {% endif %}
         </div>
-    {% else %}
-        <p class="text-muted">لا توجد مناطق مضافة بعد.</p>
-    {% endif %}
+    </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // تفعيل dropdowns
+    var dropdownElementList = [].slice.call(document.querySelectorAll('.dropdown-toggle'))
+    var dropdownList = dropdownElementList.map(function (dropdownToggleEl) {
+        return new bootstrap.Dropdown(dropdownToggleEl)
+    });
+
+    // فلترة المواقع عند تغيير الشركة في نماذج التعديل
+    document.querySelectorAll('select[name="company_id"]').forEach(select => {
+        select.addEventListener('change', function() {
+            const companyId = this.value;
+            const regionSelect = this.closest('form').querySelector('select[name="region_id"]');
+
+            if (regionSelect) {
+                // هنا يمكن إضافة فلترة المناطق حسب الشركة إذا لزم الأمر
+                console.log('تم تغيير الشركة إلى:', companyId);
+            }
+        });
+    });
+
+    // إضافة تأثيرات للبطاقات
+    const cards = document.querySelectorAll('.location-card, .site-card, .place-card');
+    cards.forEach(card => {
+        card.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-2px)';
+            this.style.transition = 'transform 0.2s ease';
+        });
+
+        card.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(0)';
+        });
+    });
+
+    // البحث في القائمة
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.placeholder = 'ابحث في المناطق والمواقع والأماكن...';
+    searchInput.className = 'form-control mb-3';
+    searchInput.style.borderRadius = '20px';
+
+    const cardHeader = document.querySelector('.card-header.py-3.d-flex');
+    if (cardHeader) {
+        cardHeader.parentNode.insertBefore(searchInput, cardHeader.nextSibling);
+
+        searchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const cards = document.querySelectorAll('.location-card, .site-card, .place-card');
+
+            cards.forEach(card => {
+                const text = card.textContent.toLowerCase();
+                if (text.includes(searchTerm)) {
+                    card.style.display = 'block';
+                    card.closest('.col-lg-6').style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                    card.closest('.col-lg-6').style.display = 'none';
+                }
+            });
+        });
+    }
+});
+</script>
+
+<style>
+.location-card, .site-card, .place-card {
+    transition: all 0.3s ease;
+    border-radius: 10px;
+}
+
+.location-card:hover, .site-card:hover, .place-card:hover {
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.card-header {
+    border-radius: 10px 10px 0 0 !important;
+}
+
+.border-left-primary { border-left: 4px solid #4e73df !important; }
+.border-left-success { border-left: 4px solid #1cc88a !important; }
+.border-left-info { border-left: 4px solid #36b9cc !important; }
+.border-left-warning { border-left: 4px solid #f6c23e !important; }
+
+.dropdown-menu {
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.input-group-sm .form-control,
+.input-group-sm .form-select {
+    border-radius: 5px;
+}
+
+.badge {
+    border-radius: 10px;
+}
+
+/* تنسيق متجاوب */
+@media (max-width: 768px) {
+    .card-header h6 {
+        font-size: 0.9rem;
+    }
+
+    .dropdown-menu {
+        position: fixed !important;
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        width: 90% !important;
+    }
+}
+</style>
 {% endblock %}
