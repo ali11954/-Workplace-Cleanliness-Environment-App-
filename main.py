@@ -1023,30 +1023,45 @@ def users():
     try:
         print(f"=== تشخيص دالة users() ===")
         print(f"المستخدم الحالي: {current_user.username}")
-        print(f"is_admin (DB): {current_user.is_admin}")
+        print(f"is_admin: {current_user.is_admin}")
         print(f"is_administrator: {current_user.is_administrator}")
         print(f"role: {current_user.role}")
         print(f"company_id: {current_user.company_id}")
 
-        # استخدام is_administrator بدلاً من is_admin
+        # الحصول على جميع المستخدمين مع معلومات الشركات والصلاحيات
         if current_user.is_administrator:
-            users_list = User.query.all()
+            users_list = User.query.options(
+                db.joinedload(User.company),
+                db.joinedload(User.user_permissions)
+            ).all()
             print(f"✅ المسؤول يرى جميع المستخدمين: {len(users_list)} مستخدم")
 
         elif current_user.role in ['supervisor', 'sub_admin'] and current_user.company_id:
-            users_list = User.query.filter_by(company_id=current_user.company_id).all()
+            users_list = User.query.options(
+                db.joinedload(User.company),
+                db.joinedload(User.user_permissions)
+            ).filter_by(company_id=current_user.company_id).all()
             print(f"🔹 المشرف يرى مستخدمي الشركة {current_user.company_id}: {len(users_list)} مستخدم")
 
         else:
             users_list = [current_user]
             print(f"👤 مستخدم عادي يرى نفسه فقط: {len(users_list)} مستخدم")
 
-        # طباعة أسماء المستخدمين المعروضين
+        # الحصول على جميع الشركات للعرض (للمسؤولين فقط)
+        companies = Company.query.filter_by(active=True).all() if current_user.is_administrator else []
+
+        # الحصول على جميع أنواع الصلاحيات المتاحة
+        all_permissions = Permission.query.order_by(Permission.category, Permission.name).all()
+
         print("=== المستخدمين المعروضين ===")
         for user in users_list:
             print(f"👤 {user.username} (id: {user.id}, role: {user.role}, company: {user.company_id})")
+            print(f"   الصلاحيات: {user.all_permissions}")
 
-        return render_template('admin/users.html', users=users_list)
+        return render_template('admin/users.html',
+                             users=users_list,
+                             companies=companies,
+                             all_permissions=all_permissions)
 
     except Exception as e:
         print(f"❌ خطأ في دالة users: {str(e)}")
@@ -1057,6 +1072,7 @@ def users():
 
 
 # --- إضافة مستخدم ---
+
 @app.route('/users/add', methods=['GET', 'POST'])
 @login_required
 @permission_required('users_add')
@@ -1066,21 +1082,23 @@ def add_user():
     form.active.choices = [('1', 'نعم'), ('0', 'لا')]
 
     # تحديد الأدوار المتاحة بناءً على صلاحيات المستخدم
-    if current_user.is_admin:
+    if current_user.role == 'admin':  # ✅ استخدم role بدلاً من is_admin
         form.role.choices = [('admin', 'مسؤول'), ('supervisor', 'مشرف'), ('sub_admin', 'مشرف فرعي'), ('user', 'مستخدم')]
     elif current_user.role == 'supervisor':
         form.role.choices = [('sub_admin', 'مشرف فرعي'), ('user', 'مستخدم')]
     else:
         form.role.choices = [('user', 'مستخدم')]
 
-    # تحديد الشركات المتاحة
-    if current_user.is_admin:
-        companies = Company.query.filter_by(is_active=True).all()
+    # ✅ إصلاح: تحديد الشركات المتاحة
+    if current_user.role == 'admin':
+        companies = Company.query.all()  # ✅ جميع الشركات بدون فلتر
         form.company_id.choices = [(c.id, c.name) for c in companies]
+        print(f"✅ المسؤول يرى {len(companies)} شركة")
     else:
-        # المشرفين الفرعيين والمشرفين يضيفون مستخدمين لشركتهم فقط
+        # المشرفين يضيفون مستخدمين لشركتهم فقط
         form.company_id.choices = [(current_user.company_id, current_user.company.name)]
         form.company_id.data = current_user.company_id
+        print(f"🔹 المشرف يرى شركته فقط: {current_user.company.name}")
 
     users_list = User.query.all()
     regions_list = Location.query.order_by(Location.name).all()
@@ -1132,6 +1150,7 @@ def add_user():
 
 
 # --- تعديل مستخدم ---
+
 @app.route('/users/edit/<int:user_id>', methods=['GET', 'POST'])
 @login_required
 @permission_required('users_edit')
@@ -1145,20 +1164,25 @@ def edit_user(user_id):
     form = UserForm(obj=user)
     form.active.choices = [('1', 'نعم'), ('0', 'لا')]
 
-    # تحديد الأدوار المتاحة
-    if current_user.is_admin:
+    # ✅ إصلاح: تحديد الأدوار المتاحة
+    if current_user.role == 'admin':  # استخدم role بدلاً من is_admin
         form.role.choices = [('admin', 'مسؤول'), ('supervisor', 'مشرف'), ('sub_admin', 'مشرف فرعي'), ('user', 'مستخدم')]
     elif current_user.role == 'supervisor':
         form.role.choices = [('sub_admin', 'مشرف فرعي'), ('user', 'مستخدم')]
     else:
         form.role.choices = [('user', 'مستخدم')]
 
-    # تحديد الشركات المتاحة
-    if current_user.is_admin:
-        companies = Company.query.filter_by(is_active=True).all()
+    # ✅ إصلاح: تحديد الشركات المتاحة
+    if current_user.role == 'admin':
+        companies = Company.query.all()  # جميع الشركات بدون فلتر
         form.company_id.choices = [(c.id, c.name) for c in companies]
+        print(f"✅ المسؤول يرى {len(companies)} شركة للتعديل")
     else:
         form.company_id.choices = [(current_user.company_id, current_user.company.name)]
+        print(f"🔹 المشرف يرى شركته فقط: {current_user.company.name}")
+
+    # الحصول على جميع الصلاحيات
+    all_permissions = Permission.query.order_by(Permission.category, Permission.name).all()
 
     users_list = User.query.all()
     regions_list = Location.query.order_by(Location.name).all()
@@ -1173,12 +1197,17 @@ def edit_user(user_id):
         form.active.data = '1' if user.active else '0'
         form.region_ids.data = [r.id for r in user.regions]
         form.company_id.data = user.company_id
+        print(f"🔹 تحميل بيانات المستخدم: {user.username}, الشركة: {user.company_id}")
+
+    # الصلاحيات الحالية للمستخدم
+    current_permissions = [up.permission_code for up in user.user_permissions]
 
     if form.validate_on_submit():
         if User.query.filter(User.id != user.id, User.username == form.username.data).first():
             flash('اسم المستخدم موجود مسبقاً', 'warning')
             return render_template('admin/user_form.html', form=form, users=users_list, regions=regions_list,
-                                   selected_user_id=user.id)
+                                   selected_user_id=user.id, all_permissions=all_permissions,
+                                   current_permissions=current_permissions)
 
         try:
             user.fullname = form.fullname.data
@@ -1187,29 +1216,56 @@ def edit_user(user_id):
             user.role = form.role.data
             user.active = (form.active.data == '1')
 
-            # فقط المسؤولون يمكنهم تغيير الشركة
-            if current_user.is_admin:
+            # ✅ إصلاح: فقط المسؤولون يمكنهم تغيير الشركة
+            if current_user.role == 'admin':  # استخدم role بدلاً من is_admin
                 user.company_id = form.company_id.data
+                print(f"✅ المسؤول قام بتغيير الشركة إلى: {form.company_id.data}")
 
             if form.password.data:
                 user.set_password(form.password.data)
+                print("🔑 تم تحديث كلمة المرور")
 
             if form.region_ids.data:
                 user.regions = Location.query.filter(Location.id.in_(form.region_ids.data)).all()
+                print(f"📍 تم تحديث المناطق: {len(user.regions)} منطقة")
             else:
                 user.regions = []
+                print("📍 تم إزالة جميع المناطق")
+
+            # تحديث الصلاحيات للمشرفين الفرعيين
+            if user.role == 'sub_admin':
+                # حذف الصلاحيات الحالية
+                UserPermission.query.filter_by(user_id=user.id).delete()
+
+                # إضافة الصلاحيات الجديدة
+                selected_permissions = request.form.getlist('permissions')
+                for perm_code in selected_permissions:
+                    user_perm = UserPermission(
+                        user_id=user.id,
+                        permission_code=perm_code
+                    )
+                    db.session.add(user_perm)
+
+                print(f"🔐 تم تحديث {len(selected_permissions)} صلاحية للمشرف الفرعي")
 
             db.session.commit()
             flash('تم تعديل بيانات المستخدم', 'success')
+            print(f"✅ تم تعديل المستخدم {user.username} بنجاح")
             return redirect(url_for('users'))
 
         except Exception as e:
             db.session.rollback()
-            flash(f'حدث خطأ أثناء تعديل المستخدم: {str(e)}', 'danger')
+            error_msg = f'حدث خطأ أثناء تعديل المستخدم: {str(e)}'
+            flash(error_msg, 'danger')
+            print(f"❌ {error_msg}")
 
-    return render_template('admin/user_form.html', form=form, users=users_list, regions=regions_list,
-                           selected_user_id=user.id)
-
+    return render_template('admin/user_form.html',
+                           form=form,
+                           users=users_list,
+                           regions=regions_list,
+                           selected_user_id=user.id,
+                           all_permissions=all_permissions,
+                           current_permissions=current_permissions)
 
 # --- حذف مستخدم ---
 @app.route('/users/delete/<int:user_id>', methods=['POST'])
@@ -1243,84 +1299,6 @@ def delete_user(user_id):
     return redirect(url_for('users'))
 
 
-# routes_permissions.py - دوال إدارة الصلاحيات للمشرفين الفرعيين
-
-@app.route('/admin/sub-admins/<int:admin_id>/permissions', methods=['GET', 'POST'])
-@login_required
-@permission_required('manage_permissions')
-def manage_sub_admin_permissions(admin_id):
-    """إدارة صلاحيات المشرف الفرعي"""
-    sub_admin = User.query.get_or_404(admin_id)
-
-    # التأكد من أن المستخدم مشرف فرعي وفي نفس الشركة
-    if sub_admin.role != 'sub_admin':
-        flash('المستخدم المحدد ليس مشرفاً فرعياً', 'danger')
-        return redirect(url_for('users'))
-
-    if not current_user.can_manage_user(sub_admin):
-        flash('غير مصرح لك بإدارة صلاحيات هذا المشرف', 'danger')
-        return redirect(url_for('users'))
-
-    # الصلاحيات المتاحة للمشرفين الفرعيين
-    available_permissions = {
-        'users': [
-            {'code': 'users_view', 'name': 'عرض المستخدمين'},
-            {'code': 'users_add', 'name': 'إضافة مستخدمين'},
-            {'code': 'users_edit', 'name': 'تعديل المستخدمين'},
-            {'code': 'users_delete', 'name': 'حذف المستخدمين'}
-        ],
-        'evaluations': [
-            {'code': 'evaluations_view', 'name': 'عرض التقييمات'},
-            {'code': 'evaluations_add', 'name': 'إضافة تقييمات'},
-            {'code': 'evaluations_edit', 'name': 'تعديل التقييمات'},
-            {'code': 'evaluations_delete', 'name': 'حذف التقييمات'}
-        ],
-        'reports': [
-            {'code': 'reports_view', 'name': 'عرض التقارير'},
-            {'code': 'reports_export', 'name': 'تصدير التقارير'}
-        ]
-    }
-
-    if request.method == 'POST':
-        try:
-            # حذف الصلاحيات الحالية
-            UserPermission.query.filter_by(user_id=admin_id).delete()
-
-            # إضافة الصلاحيات الجديدة
-            selected_permissions = request.form.getlist('permissions')
-            for perm_code in selected_permissions:
-                user_perm = UserPermission(
-                    user_id=admin_id,
-                    permission_code=perm_code
-                )
-                db.session.add(user_perm)
-
-            db.session.commit()
-            flash('تم تحديث صلاحيات المشرف الفرعي بنجاح', 'success')
-            return redirect(url_for('users'))
-
-        except Exception as e:
-            db.session.rollback()
-            flash(f'حدث خطأ أثناء تحديث الصلاحيات: {str(e)}', 'danger')
-
-    # الصلاحيات الحالية للمشرف
-    current_permissions = [up.permission_code for up in sub_admin.user_permissions]
-
-    return render_template('admin/sub_admin_permissions.html',
-                           sub_admin=sub_admin,
-                           available_permissions=available_permissions,
-                           current_permissions=current_permissions)
-
-@app.route('/api/user/<int:user_id>/permissions')
-@login_required
-def get_user_permissions(user_id):
-    """API للحصول على صلاحيات مستخدم"""
-    user = User.query.get_or_404(user_id)
-    return jsonify({
-        'permissions': user.all_permissions,
-        'role': user.role,
-        'company_id': user.company_id
-    })
 
 
 # دالة لتهيئة الصلاحيات الافتراضية
@@ -1358,6 +1336,108 @@ def initialize_default_permissions():
 
     db.session.commit()
 
+
+@app.route('/admin/sub-admins-simple')
+@login_required
+def manage_sub_admins_simple():
+    """إصفح بسيط يعمل 100%"""
+    print(f"\n=== 🎯 الإصدار البسيط يعمل ===")
+    print(f"المستخدم: {current_user.username}, الدور: {current_user.role}, is_admin: {current_user.is_admin}")
+
+    # ✅ تحقق بسيط: إذا كان مسؤولاً أو مشرفاً، اسمح له
+    if current_user.is_admin or current_user.role in ['supervisor', 'sub_admin']:
+        print("✅ الوصول مسموح")
+    else:
+        print("❌ الوصول مرفوض")
+        flash('غير مصرح لك بالوصول إلى هذه الصفحة', 'danger')
+        return redirect(url_for('index'))
+
+    try:
+        # الحصول على جميع المشرفين الفرعيين
+        if current_user.is_admin:
+            # المسؤول يرى الجميع
+            sub_admins = User.query.filter_by(role='sub_admin').options(
+                db.joinedload(User.company),
+                db.joinedload(User.user_permissions)
+            ).all()
+            companies_list = Company.query.filter_by(is_active=True).all()
+            current_company = None
+        else:
+            # المشرف يرى مشرفي شركته فقط
+            sub_admins = User.query.filter_by(
+                role='sub_admin',
+                company_id=current_user.company_id
+            ).options(
+                db.joinedload(User.company),
+                db.joinedload(User.user_permissions)
+            ).all()
+            companies_list = Company.query.filter_by(id=current_user.company_id, is_active=True).all()
+            current_company = current_user.company
+
+        # تحضير البيانات للعرض
+        sub_admins_data = []
+        for admin in sub_admins:
+            admin_data = {
+                'id': admin.id,
+                'name': admin.fullname or admin.username,
+                'email': admin.email,
+                'is_active': admin.active,
+                'permissions_count': len(admin.user_permissions),
+                'permissions': [up.permission_code for up in admin.user_permissions],
+                'company_name': admin.company.name if admin.company else 'غير محدد'
+            }
+            sub_admins_data.append(admin_data)
+
+        print(f"✅ تم تحضير {len(sub_admins_data)} مشرف للعرض")
+
+        return render_template('admin/manage_sub_admins.html',
+                               sub_admins=sub_admins_data,
+                               companies_list=companies_list,
+                               current_company=current_company,
+                               selected_company_id=current_user.company_id if not current_user.is_admin else None,
+                               now=datetime.now())
+
+    except Exception as e:
+        print(f"❌ خطأ: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        flash('حدث خطأ في تحميل الصفحة', 'danger')
+        return redirect(url_for('index'))
+
+@app.route('/fix-permissions')
+@login_required
+def fix_permissions():
+    """إصلاح الصلاحيات للمسؤولين"""
+    if not current_user.is_admin:
+        return "غير مصرح"
+
+    from models import Permission, UserPermission
+
+    # إنشاء صلاحية manage_permissions إذا لم تكن موجودة
+    perm = Permission.query.filter_by(code='manage_permissions').first()
+    if not perm:
+        perm = Permission(
+            name='إدارة الصلاحيات',
+            code='manage_permissions',
+            category='admin'
+        )
+        db.session.add(perm)
+        db.session.commit()
+        print("✅ تم إنشاء صلاحية manage_permissions")
+
+    # منح الصلاحية لجميع المسؤولين
+    admins = User.query.filter_by(role='admin').all()
+    for admin in admins:
+        if not UserPermission.query.filter_by(user_id=admin.id, permission_code='manage_permissions').first():
+            user_perm = UserPermission(
+                user_id=admin.id,
+                permission_code='manage_permissions'
+            )
+            db.session.add(user_perm)
+            print(f"✅ تم منح الصلاحية للمسؤول: {admin.username}")
+
+    db.session.commit()
+    return "✅ تم إصلاح الصلاحيات بنجاح"
 
 # routes_debug.py - دوال للمساعدة في تشخيص المشكلة
 @app.route('/debug/users')
@@ -1410,6 +1490,214 @@ def debug_user_permissions(user_id):
         'all_permissions': user.all_permissions
     })
 
+
+@app.route('/admin/sub-admins')
+@login_required
+def manage_sub_admins():
+    """إدارة المشرفين الفرعيين - الإصدار النهائي"""
+    print(f"\n=== 🎯 الإصدار النهائي يعمل ===")
+    print(f"المستخدم: {current_user.username}, الدور: {current_user.role}")
+
+    # ✅ تحقق مبسط
+    if current_user.role not in ['admin', 'supervisor', 'sub_admin']:
+        flash('غير مصرح لك بالوصول إلى هذه الصفحة', 'danger')
+        return redirect(url_for('index'))
+
+    try:
+        # الحصول على جميع الشركات
+        if current_user.role == 'admin':
+            companies_list = Company.query.all()
+            sub_admins = User.query.filter_by(role='sub_admin').all()
+            current_company = None
+            selected_company_id = None
+        else:
+            companies_list = Company.query.filter_by(id=current_user.company_id).all()
+            sub_admins = User.query.filter_by(role='sub_admin', company_id=current_user.company_id).all()
+            current_company = current_user.company
+            selected_company_id = current_user.company_id
+
+        # تحضير البيانات للعرض
+        sub_admins_data = []
+        for admin in sub_admins:
+            # الحصول على الصلاحيات بشكل آمن
+            permissions_count = 0
+            permissions_list = []
+
+            if hasattr(admin, 'user_permissions'):
+                permissions_count = len(admin.user_permissions)
+                permissions_list = [up.permission_code for up in admin.user_permissions]
+
+            admin_data = {
+                'id': admin.id,
+                'name': admin.fullname or admin.username,
+                'email': admin.email,
+                'is_active': admin.active,
+                'permissions_count': permissions_count,
+                'permissions': permissions_list,
+                'company_name': admin.company.name if admin.company else 'غير محدد'
+            }
+            sub_admins_data.append(admin_data)
+
+        print(f"✅ تم تحضير {len(sub_admins_data)} مشرف للعرض")
+        print(f"✅ عدد الشركات: {len(companies_list)}")
+
+        return render_template('admin/manage_sub_admins.html',
+                               sub_admins=sub_admins_data,
+                               companies_list=companies_list,
+                               current_company=current_company,
+                               selected_company_id=selected_company_id,
+                               now=datetime.now())
+
+    except Exception as e:
+        print(f"❌ خطأ: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        flash('حدث خطأ في تحميل الصفحة', 'danger')
+        return redirect(url_for('index'))
+
+@app.route('/debug/current-function')
+@login_required
+def debug_current_function():
+    """عرض الكود الحالي للدالة"""
+    import inspect
+    try:
+        # الحصول على كود الدالة الحالية
+        func_code = inspect.getsource(manage_sub_admins)
+        return f"""
+        <html><body style="font-family: Arial; padding: 20px; direction: rtl;">
+            <h1>🔍 كود الدالة الحالي</h1>
+            <pre style="background: #f0f0f0; padding: 15px; border-radius: 10px; white-space: pre-wrap;">
+{func_code}
+            </pre>
+            <a href="/admin/sub-admins-simple" style="background: green; color: white; padding: 10px; text-decoration: none;">
+                🚀 جرب الإصدار البسيط
+            </a>
+        </body></html>
+        """
+    except Exception as e:
+        return f"خطأ في عرض الكود: {e}"
+
+
+@app.route('/api/sub-admins', methods=['POST'])
+@login_required
+@permission_required('users_add')
+def api_add_sub_admin():
+    """إضافة مشرف فرعي جديد عبر API"""
+    try:
+        data = request.get_json()
+
+        # التحقق من البيانات
+        required_fields = ['name', 'email', 'company_id']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'success': False, 'message': f'حقل {field} مطلوب'}), 400
+
+        # التحقق من الصلاحيات
+        if not current_user.can_manage_company(data['company_id']):
+            return jsonify({'success': False, 'message': 'غير مصرح لك بإضافة مشرفين في هذه الشركة'}), 403
+
+        # التحقق من عدم وجود مستخدم بنفس البريد
+        if User.query.filter_by(email=data['email']).first():
+            return jsonify({'success': False, 'message': 'البريد الإلكتروني موجود مسبقاً'}), 400
+
+        # إنشاء المستخدم
+        user = User(
+            fullname=data['name'],
+            username=data['email'],  # استخدام البريد كاسم مستخدم
+            email=data['email'],
+            role='sub_admin',
+            company_id=data['company_id'],
+            active=data.get('is_active', True)
+        )
+
+        # تعيين كلمة مرور افتراضية
+        password = data.get('password', 'default123')
+        user.set_password(password)
+
+        db.session.add(user)
+        db.session.flush()  # للحصول على ID
+
+        # إضافة الصلاحيات المحددة
+        permissions = data.get('permissions', [])
+        for perm_code in permissions:
+            user_perm = UserPermission(
+                user_id=user.id,
+                permission_code=perm_code
+            )
+            db.session.add(user_perm)
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'تم إضافة المشرف الفرعي بنجاح',
+            'user_id': user.id
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'حدث خطأ: {str(e)}'}), 500
+
+
+@app.route('/api/sub-admins/<int:admin_id>', methods=['PUT', 'DELETE'])
+@login_required
+@permission_required('users_edit')
+def api_manage_sub_admin(admin_id):
+    """تعديل أو حذف مشرف فرعي"""
+    try:
+        admin = User.query.get_or_404(admin_id)
+
+        # التحقق من الصلاحيات
+        if not current_user.can_manage_user(admin):
+            return jsonify({'success': False, 'message': 'غير مصرح لك بإدارة هذا المشرف'}), 403
+
+        if request.method == 'PUT':
+            data = request.get_json()
+
+            # تحديث البيانات الأساسية
+            if 'name' in data:
+                admin.fullname = data['name']
+            if 'email' in data:
+                admin.email = data['email']
+                admin.username = data['email']  # تحديث اسم المستخدم أيضاً
+            if 'is_active' in data:
+                admin.active = data['is_active']
+            if 'password' in data and data['password']:
+                admin.set_password(data['password'])
+
+            # تحديث الصلاحيات
+            if 'permissions' in data:
+                # حذف الصلاحيات الحالية
+                UserPermission.query.filter_by(user_id=admin_id).delete()
+
+                # إضافة الصلاحيات الجديدة
+                for perm_code in data['permissions']:
+                    user_perm = UserPermission(
+                        user_id=admin_id,
+                        permission_code=perm_code
+                    )
+                    db.session.add(user_perm)
+
+            db.session.commit()
+            return jsonify({'success': True, 'message': 'تم تحديث بيانات المشرف بنجاح'})
+
+        elif request.method == 'DELETE':
+            # التحقق من عدم وجود تقييمات مرتبطة
+            if admin.evaluations:
+                admin.active = False
+                db.session.commit()
+                return jsonify({
+                    'success': True,
+                    'message': 'المستخدم مرتبط بتقييمات، تم تغييره إلى غير نشط بدلاً من الحذف'
+                })
+
+            db.session.delete(admin)
+            db.session.commit()
+            return jsonify({'success': True, 'message': 'تم حذف المشرف بنجاح'})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'حدث خطأ: {str(e)}'}), 500
 
 # routes_permissions.py - إصلاح دوال إدارة الصلاحيات
 @app.route('/admin/sub-admins/<int:admin_id>/permissions', methods=['GET', 'POST'])

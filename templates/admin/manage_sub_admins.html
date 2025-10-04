@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>إدارة المشرفين الفرعيين</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            direction: rtl;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+        }
+        .success {
+            background: #d4edda;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            border-right: 5px solid #28a745;
+        }
+        .info-box {
+            background: #e7f3ff;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            border-right: 5px solid #007bff;
+        }
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        .btn-warning {
+            background: #ffc107;
+            color: black;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 12px;
+            text-align: right;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background: #f8f9fa;
+            font-weight: bold;
+        }
+        .badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .badge-success { background: #28a745; color: white; }
+        .badge-warning { background: #ffc107; color: black; }
+        .badge-danger { background: #dc3545; color: white; }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 إدارة المشرفين الفرعيين</h1>
+            <p>نظام إدارة الصلاحيات والوصول</p>
+        </div>
+
+        <div class="success">
+            <strong>✅ نجاح!</strong> تم تحميل صفحة إدارة المشرفين الفرعيين بنجاح.
+        </div>
+
+        <div class="info-box">
+            <h3>📊 معلومات النظام:</h3>
+            <p><strong>المستخدم:</strong> {{ current_user.username }}</p>
+            <p><strong>الدور:</strong> {{ current_user.role }}</p>
+            <p><strong>عدد المشرفين:</strong> {{ sub_admins|length }}</p>
+            <p><strong>عدد الشركات:</strong> {{ companies_list|length }}</p>
+        </div>
+
+        <div class="actions">
+            <a href="/users/add" class="btn btn-primary">➕ إضافة مشرف فرعي جديد</a>
+            <a href="/create-test-sub-admin" class="btn btn-success">🔄 إنشاء مشرف تجريبي</a>
+            <a href="/users" class="btn btn-warning">👥 إدارة جميع المستخدمين</a>
+        </div>
+
+        {% if sub_admins %}
+        <h2>👥 قائمة المشرفين الفرعيين</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>الاسم</th>
+                    <th>البريد الإلكتروني</th>
+                    <th>الشركة</th>
+                    <th>الحالة</th>
+                    <th>عدد الصلاحيات</th>
+                    <th>الإجراءات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for admin in sub_admins %}
+                <tr>
+                    <td><strong>{{ admin.name }}</strong></td>
+                    <td>{{ admin.email }}</td>
+                    <td>{{ admin.company_name }}</td>
+                    <td>
+                        <span class="badge {% if admin.is_active %}badge-success{% else %}badge-danger{% endif %}">
+                            {{ 'نشط' if admin.is_active else 'غير نشط' }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge badge-warning">{{ admin.permissions_count }}</span>
+                    </td>
+                    <td>
+                        <a href="/users/edit/{{ admin.id }}" class="btn btn-warning" style="padding: 5px 10px; font-size: 12px;">تعديل</a>
+                        <a href="/admin/sub-admins/{{ admin.id }}/permissions" class="btn btn-primary" style="padding: 5px 10px; font-size: 12px;">الصلاحيات</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <h3>🔧 الصلاحيات التفصيلية:</h3>
+        {% for admin in sub_admins %}
+        <div style="background: #f8f9fa; padding: 10px; margin: 10px 0; border-radius: 5px;">
+            <strong>{{ admin.name }}:</strong>
+            {% if admin.permissions %}
+                {{ admin.permissions|join(', ') }}
+            {% else %}
+                <span style="color: #6c757d;">لا توجد صلاحيات</span>
+            {% endif %}
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="empty-state">
+            <h3>📭 لا يوجد مشرفين فرعيين</h3>
+            <p>لم يتم إضافة أي مشرفين فرعيين في النظام بعد.</p>
+            <div class="actions">
+                <a href="/users/add" class="btn btn-primary">➕ إضافة أول مشرف فرعي</a>
+                <a href="/create-test-sub-admin" class="btn btn-success">🔄 إنشاء مشرف تجريبي</a>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if companies_list %}
+        <h2>🏢 الشركات المتاحة</h2>
+        <ul>
+            {% for company in companies_list %}
+            <li><strong>{{ company.name }}</strong> (ID: {{ company.id }})</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
+        <div style="text-align: center; margin-top: 30px; padding: 20px; border-top: 1px solid #ddd;">
+            <a href="/dashboard" class="btn btn-primary">← العودة للوحة التحكم</a>
+        </div>
+    </div>
+</body>
+</html>
