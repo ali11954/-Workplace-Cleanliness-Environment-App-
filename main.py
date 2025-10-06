@@ -53,84 +53,67 @@ from flask import Flask
 from models import db ,Location,Site,Place,Criterion,Evaluation,EvaluationDetail  # ← استيراد db من models فقط
 
 
-
-
-# في بداية الملف بعد الاستيرادات
 import os
 from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager
+from functools import wraps
+from flask import redirect, url_for, flash
+from flask_login import current_user
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 
+# إنشاء تطبيق Flask
 app = Flask(__name__)
-# إعدادات SECRET_KEY - تأكد من وجود قيمة افتراضية
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production-12345'
-# إعدادات قاعدة البيانات للنشر
-# إعدادات قاعدة البيانات للنشر
-database_url = os.environ.get('DATABASE_URL')
+
+# 🔐 إعداد SECRET_KEY
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production-12345')
+
+# 🔗 إعداد قاعدة البيانات
+database_url = os.getenv('DATABASE_URL')
 if database_url:
-    # تحويل من postgres إلى postgresql لـ SQLAlchemy
+    # Render يستخدم postgres:// أحيانًا، SQLAlchemy يحتاج postgresql://
     if database_url.startswith('postgres://'):
         database_url = database_url.replace('postgres://', 'postgresql://', 1)
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 else:
-    # للتطوير المحلي
+    # تشغيل محلي (بدون Render)
     basedir = os.path.abspath(os.path.dirname(__file__))
     instance_path = os.path.join(basedir, 'instance')
     os.makedirs(instance_path, exist_ok=True)
     app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(instance_path, 'database.db')}"
 
-# تأكد أن db مستورد من models بشكل صحيح
-from models import db
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# 🔥 إنشاء قاعدة البيانات
+from models import db, User  # تأكد أن User معرف داخل models.py
 db.init_app(app)
 
+# ⚙️ تهيئة Flask-Login
+login_manager = LoginManager(app)
+login_manager.login_view = 'login'
 
-@app.route("/debug-users")
-def debug_users():
-    users = User.query.all()
-    return "<br>".join([f"{u.username} - {u.email} - {u.role}" for u in users])
-
-# إنشاء تطبيق Flask
-
-# تهيئة قاعدة البيانات وتسجيل الدخول
-
-# ⚠️ إصلاح Flask-Login - التهيئة الصحيحة
-
-
-# التحقق من وجود قاعدة البيانات
+# ✅ اختبار الاتصال بقاعدة البيانات عند التشغيل المحلي فقط
 if __name__ == "__main__":
     with app.app_context():
-        with db.engine.connect() as conn:
-            print("تم الاتصال بقاعدة البيانات بنجاح")
+        try:
+            db.session.execute("SELECT 1")
+            print("✅ تم الاتصال بقاعدة البيانات بنجاح")
+        except Exception as e:
+            print("❌ خطأ في الاتصال بقاعدة البيانات:", e)
 
-
-# تسجيل خط Amiri
+# ====== إعداد خط PDF (اختياري) ======
 font_path = 'fonts/Amiri-Regular.ttf'
 if os.path.exists(font_path):
     pdfmetrics.registerFont(TTFont('Amiri', font_path))
 else:
-    print("تحذير: خط Amiri غير موجود - تقارير PDF قد لا تعرض العربية بشكل صحيح.")
+    print("⚠️ تحذير: خط Amiri غير موجود - قد لا تظهر العربية بشكل صحيح في PDF")
 
-# ====== MODELS ======
-    # بقية الحقول والدوال هنا
-
-    @property
-    def is_active(self):
-        return self.active
-
-    @property
-    def is_authenticated(self):
-        return True
-
-    @property
-    def is_anonymous(self):
-        return False
-
-    def get_id(self):
-        return str(self.id)
-
+# ====== الدوال المساعدة ======
 def permission_required(permission):
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
-            # تحقق من أن المستخدم لديه خاصية has_permission
             if not hasattr(current_user, 'has_permission') or not current_user.has_permission(permission):
                 flash("لا تملك الصلاحية المطلوبة.", "danger")
                 return redirect(url_for("dashboard"))
@@ -138,24 +121,21 @@ def permission_required(permission):
         return decorated_function
     return decorator
 
-from functools import wraps
-from flask import redirect, url_for, flash
-from flask_login import current_user
 
 def company_access_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # مثال: تحقق أن المستخدم مرتبط بشركة
-        if not hasattr(current_user, 'company_id') or current_user.company_id is None:
+        if not getattr(current_user, 'company_id', None):
             flash("لا تملك صلاحية الوصول إلى هذه الشركة.", "danger")
             return redirect(url_for("dashboard"))
         return f(*args, **kwargs)
     return decorated_function
-# تحقق من إدارة المستخدمين
+
+
 def user_management_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not getattr(current_user, 'role', None) in ['admin', 'supervisor']:
+        if getattr(current_user, 'role', None) not in ['admin', 'supervisor']:
             flash("ليس لديك صلاحية إدارة المستخدمين.", "danger")
             return redirect(url_for('dashboard'))
         return f(*args, **kwargs)
