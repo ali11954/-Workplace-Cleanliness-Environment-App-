@@ -4,11 +4,24 @@
 
 {% block content %}
 <div class="main-container">
-    <h2 class="text-success fw-bold text-center">تطبيق تقييم بيئة العمل والنظافة</h2>
-    <p class="text-center">يمكنك الوصول إلى جميع واجهات النظام من خلال البطاقات أدناه.</p>
+    <!-- ===================== الهيدر المحسن ===================== -->
+    <div class="dashboard-header mb-4">
+        <div class="header-content">
+            <div class="app-title-section">
+                <h2 class="text-success fw-bold">تطبيق تقييم بيئة العمل والنظافة</h2>
+                <p class="text-muted">يمكنك الوصول إلى جميع واجهات النظام من خلال البطاقات أدناه.</p>
+            </div>
+
+                <div class="user-info">
+                    <i class="fas fa-user-circle me-2"></i>
+                    <span class="user-name">{{ current_user.username }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- ===================== البطاقات الرئيسية ===================== -->
-   {% if current_user.is_admin %}
+    {% if current_user.is_admin %}
     {% set features = [
         {'url':'evaluations', 'icon':'fa-clipboard-check', 'text':'التقييمات', 'bg':'bg-evaluations'},
         {'url':'users', 'icon':'fa-user', 'text':'المستخدمون', 'bg':'bg-users'},
@@ -19,13 +32,13 @@
         {'url':'reports', 'icon':'fa-file-alt', 'text':'تقرير تقييم المستخدمين', 'bg':'bg-report-general'},
         {'url':'responsibility_report', 'icon':'fa-balance-scale', 'text':'تقرير الجهات المسؤولة', 'bg':'bg-report-responsibility'}
     ] %}
-{% else %}
+    {% else %}
     {% set features = [
         {'url':'evaluations', 'icon':'fa-clipboard-check', 'text':'التقييمات', 'bg':'user-bg-evaluations'},
         {'url':'report_summary', 'icon':'fa-broom', 'text':'تقرير تقييم المناطق', 'bg':'user-bg-report-evaluation'},
         {'url':'responsibility_report', 'icon':'fa-balance-scale', 'text':'تقرير الجهات المسؤولة', 'bg':'user-bg-report-responsibility'}
     ] %}
-{% endif %}
+    {% endif %}
 
     <div class="card-container d-flex flex-wrap justify-content-center gap-3 mt-4">
         {% for feature in features %}
@@ -63,18 +76,15 @@
 <div id="appInfoModal" class="app-info-modal">
     <div class="app-info-content">
         <span class="close" onclick="toggleAppInfo()">&times;</span>
-      <h3>معلومات التطبيق</h3>
+        <h3>معلومات التطبيق</h3>
         <p><strong>اسم التطبيق:</strong> نظام تقييم بيئة العمل والنظافة</p>
         <p><strong>الإصدار:</strong> 1.0.0</p>
-                        <p><strong>تواصل:</strong>للتواصل او الاستفسار </p>
+        <p><strong>تواصل:</strong>للتواصل او الاستفسار </p>
         <p><strong>المصمم:</strong> علي أحمد علي مبارك</p>
-                <p><strong>بريد:</strong>alimubark440@gmail.com</p>
-                        <p><strong>هاتف:</strong>00967-(711127883 / 773014017)</p>
-
-                <p><strong>معلومات إضافية:</strong> تم تطوير هذا النظام لتسهيل عملية تقييم المناطق والجهات وفق المعايير المحددة.</p>
-
-</div>
-
+        <p><strong>بريد:</strong>alimubark440@gmail.com</p>
+        <p><strong>هاتف:</strong>00967-(711127883 / 773014017)</p>
+        <p><strong>معلومات إضافية:</strong> تم تطوير هذا النظام لتسهيل عملية تقييم المناطق والجهات وفق المعايير المحددة.</p>
+    </div>
 </div>
 
 <!-- أيقونة تعليمات -->
@@ -103,6 +113,80 @@
 </div>
 
 <style>
+/* ===================== الهيدر المحسن ===================== */
+.dashboard-header {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 15px;
+    padding: 20px;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.app-title-section h2 {
+    margin-bottom: 5px;
+    font-size: 1.8rem;
+    background: linear-gradient(135deg, #28a745, #20c997);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.app-title-section p {
+    margin-bottom: 0;
+    color: #6c757d;
+}
+
+.user-company-section {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+}
+
+.company-badge {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 25px;
+    font-weight: 600;
+    box-shadow: 0 4px 15px rgba(0,123,255,0.3);
+    display: flex;
+    align-items: center;
+    transition: all 0.3s ease;
+}
+
+.company-badge:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,123,255,0.4);
+}
+
+.company-name {
+    font-size: 1rem;
+}
+
+.user-info {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 4px 15px rgba(40,167,69,0.3);
+}
+
+.user-name {
+    font-size: 0.9rem;
+}
+
 /* ===================== أيقونات ===================== */
 .app-info-icon,
 .help-icon {
@@ -171,7 +255,7 @@
     color: #333;
 }
 
-    /* ===================== ألوان المستخدم العادي ===================== */
+/* ===================== ألوان المستخدم العادي ===================== */
 .user-feature-card {
     border: 2px solid #f8f9fa;
 }
@@ -186,22 +270,6 @@
     background: linear-gradient(135deg, #ffb74d, #ffcc80); /* برتقالي فاتح */
 }
 
-</style>
-
-<script>
-function toggleAppInfo() {
-    document.getElementById('appInfoModal').classList.toggle('active');
-}
-
-function toggleHelp() {
-    document.getElementById('helpModal').classList.toggle('active');
-}
-</script>
-
-{% endblock %}
-
-{% block styles %}
-<style>
 /* ===================== البطاقات ===================== */
 .feature-card {
     display: flex;
@@ -281,7 +349,76 @@ function toggleHelp() {
 .print-card-btn i {
     font-size: 1.2rem;
 }
+
+/* ===================== التصميم المتجاوب ===================== */
+@media (max-width: 768px) {
+    .header-content {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .user-company-section {
+        align-items: center;
+        flex-direction: row;
+        justify-content: center;
+        gap: 15px;
+    }
+
+    .company-badge,
+    .user-info {
+        padding: 8px 16px;
+        font-size: 0.9rem;
+    }
+
+    .app-title-section h2 {
+        font-size: 1.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .user-company-section {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .company-badge,
+    .user-info {
+        width: 100%;
+        justify-content: center;
+    }
+}
 </style>
+
+<script>
+function toggleAppInfo() {
+    document.getElementById('appInfoModal').classList.toggle('active');
+}
+
+function toggleHelp() {
+    document.getElementById('helpModal').classList.toggle('active');
+}
+
+// تأثيرات تفاعلية إضافية
+document.addEventListener('DOMContentLoaded', function() {
+    // إضافة تأثيرات للهيدر
+    const header = document.querySelector('.dashboard-header');
+    if (header) {
+        header.style.opacity = '0';
+        header.style.transform = 'translateY(-20px)';
+
+        setTimeout(() => {
+            header.style.transition = 'all 0.5s ease';
+            header.style.opacity = '1';
+            header.style.transform = 'translateY(0)';
+        }, 100);
+    }
+});
+</script>
+
+{% endblock %}
+
+{% block styles %}
+<!-- تم نقل جميع الأنماط إلى داخل القالب -->
 {% endblock %}
 
 {% block scripts %}

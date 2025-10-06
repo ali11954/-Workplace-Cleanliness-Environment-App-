@@ -2,102 +2,423 @@
 {% block title %}إدارة المستخدمين{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2 class="text-primary fw-bold">قائمة المستخدمين</h2>
-    <a href="{{ url_for('add_user') }}" class="btn btn-success shadow-sm">➕ إضافة مستخدم جديد</a>
-</div>
+<div class="container-fluid py-4">
+    <!-- رأس الصفحة -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="text-primary fw-bold mb-2">👥 إدارة المستخدمين</h2>
+            <p class="text-muted mb-0">إدارة حسابات المستخدمين في النظام</p>
+        </div>
+        {% if current_user.has_permission('users_add') %}
+        <a href="{{ url_for('add_user') }}" class="btn btn-success shadow-sm">
+            <i class="fas fa-user-plus me-2"></i>إضافة مستخدم جديد
+        </a>
+        {% endif %}
+    </div>
 
-{% if users %}
-<div class="row g-4">
-    {% for user in users %}
-    <div class="col-md-4">
-        <div class="card shadow-sm h-100 user-card">
-            <div class="card-header d-flex justify-content-between align-items-center user-card-header">
-                <span>👤 {{ user.fullname }}</span>
-                <span class="badge user-role-badge">
-                    {{ 'مشرف' if user.role == 'admin' else 'مستخدم' }}
-                </span>
+    <!-- بطاقة الإحصائيات -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card stat-card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-0">{{ users|length }}</h4>
+                            <p class="mb-0">إجمالي المستخدمين</p>
+                        </div>
+                        <i class="fas fa-users fa-2x opacity-50"></i>
+                    </div>
+                </div>
             </div>
-            <div class="card-body d-flex flex-column gap-2">
-                <p><strong>اسم المستخدم:</strong> {{ user.username }}</p>
-                <p><strong>البريد الإلكتروني:</strong> {{ user.email or 'غير محدد' }}</p>
-                <p><strong>المناطق:</strong>
-                    {% if user.regions %}
-                        {% for region in user.regions %}
-                            {{ region.name }}{% if not loop.last %}, {% endif %}
-                        {% endfor %}
-                    {% else %}
-                        غير محددة
-                    {% endif %}
-                </p>
-                <p><strong>نشط:</strong> {{ 'نعم' if user.active else 'لا' }}</p>
-
-                <div class="d-flex gap-2 flex-wrap">
-                    <a href="{{ url_for('edit_user', user_id=user.id) }}" class="btn btn-warning btn-sm shadow-sm">✏️ تعديل</a>
-                    <form action="{{ url_for('delete_user', user_id=user.id) }}" method="POST" class="d-inline"
-                          onsubmit="return confirm('هل أنت متأكد من حذف المستخدم؟');">
-                        <button type="submit" class="btn btn-danger btn-sm shadow-sm">🗑️ حذف</button>
-                    </form>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-0">{{ users|selectattr('active')|list|length }}</h4>
+                            <p class="mb-0">نشط</p>
+                        </div>
+                        <i class="fas fa-user-check fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-0">{{ users|rejectattr('active')|list|length }}</h4>
+                            <p class="mb-0">غير نشط</p>
+                        </div>
+                        <i class="fas fa-user-slash fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-0">{{ users|selectattr('is_administrator')|list|length }}</h4>
+                            <p class="mb-0">مسؤولين</p>
+                        </div>
+                        <i class="fas fa-user-shield fa-2x opacity-50"></i>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-    {% endfor %}
+
+    <!-- فلترة المستخدمين -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">فلترة حسب الدور:</label>
+                    <select class="form-select" id="roleFilter">
+                        <option value="">جميع الأدوار</option>
+                        <option value="admin">مسؤول</option>
+                        <option value="supervisor">مشرف</option>
+                        <option value="sub_admin">مشرف فرعي</option>
+                        <option value="user">مستخدم عادي</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">فلترة حسب الحالة:</label>
+                    <select class="form-select" id="statusFilter">
+                        <option value="">جميع الحالات</option>
+                        <option value="active">نشط فقط</option>
+                        <option value="inactive">غير نشط فقط</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">فلترة حسب الشركة:</label>
+                    <select class="form-select" id="companyFilter">
+                        <option value="">جميع الشركات</option>
+                        {% for company in companies %}
+                        <option value="{{ company.id }}">{{ company.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">بحث:</label>
+                    <input type="text" class="form-control" id="searchInput" placeholder="ابحث بالاسم أو البريد...">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- قائمة المستخدمين -->
+    {% if users %}
+    <div class="row g-4" id="usersContainer">
+        {% for user in users %}
+        <div class="col-xl-4 col-lg-6 col-md-6 user-card-item"
+             data-role="{{ user.role }}"
+             data-status="{{ 'active' if user.active else 'inactive' }}"
+             data-company="{{ user.company_id }}"
+             data-search="{{ user.fullname.lower() }} {{ user.username.lower() }} {{ user.email.lower() if user.email else '' }}">
+            <div class="card shadow-sm h-100 user-card {% if not user.active %}user-inactive{% endif %}">
+                <div class="card-header d-flex justify-content-between align-items-center user-card-header {{ user.role }}">
+                    <div class="d-flex align-items-center">
+                        <div class="user-avatar me-2">
+                            {% if user.role == 'admin' %}
+                            <i class="fas fa-crown text-warning"></i>
+                            {% elif user.role == 'supervisor' %}
+                            <i class="fas fa-user-tie text-primary"></i>
+                            {% elif user.role == 'sub_admin' %}
+                            <i class="fas fa-user-shield text-info"></i>
+                            {% else %}
+                            <i class="fas fa-user text-secondary"></i>
+                            {% endif %}
+                        </div>
+                        <span class="fw-bold">{{ user.fullname }}</span>
+                    </div>
+                    <span class="badge user-role-badge {{ user.role }}">
+                        {{ user.role|replace('admin', 'مسؤول')|replace('supervisor', 'مشرف')|replace('sub_admin', 'مشرف فرعي')|replace('user', 'مستخدم') }}
+                    </span>
+                </div>
+
+                <div class="card-body d-flex flex-column gap-3">
+                    <!-- المعلومات الأساسية -->
+                    <div class="user-info">
+                        <div class="info-item">
+                            <i class="fas fa-user me-2 text-muted"></i>
+                            <strong>اسم المستخدم:</strong> {{ user.username }}
+                        </div>
+                        <div class="info-item">
+                            <i class="fas fa-envelope me-2 text-muted"></i>
+                            <strong>البريد:</strong> {{ user.email or 'غير محدد' }}
+                        </div>
+                        <div class="info-item">
+                            <i class="fas fa-building me-2 text-muted"></i>
+                            <strong>الشركة:</strong> {{ user.company.name if user.company else 'غير محدد' }}
+                        </div>
+                        <div class="info-item">
+                            <i class="fas fa-map-marker-alt me-2 text-muted"></i>
+                            <strong>المناطق:</strong>
+                            {% if user.regions %}
+                                {% for region in user.regions %}
+                                    <span class="badge bg-light text-dark me-1">{{ region.name }}</span>
+                                {% endfor %}
+                            {% else %}
+                                <span class="text-muted">غير محددة</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- حالة المستخدم -->
+                    <div class="user-status">
+                        <span class="badge {% if user.active %}bg-success{% else %}bg-danger{% endif %}">
+                            <i class="fas fa-circle me-1"></i>
+                            {{ 'نشط' if user.active else 'غير نشط' }}
+                        </span>
+                        {% if user.is_administrator %}
+                        <span class="badge bg-warning text-dark">
+                            <i class="fas fa-star me-1"></i>
+                            مسؤول نظام
+                        </span>
+                        {% endif %}
+                    </div>
+
+                    <!-- الصلاحيات -->
+                    {% if user.user_permissions %}
+                    <div class="user-permissions">
+                        <small class="text-muted">الصلاحيات المخصصة:</small>
+                        <div class="permissions-list">
+                            {% for perm in user.user_permissions %}
+                            <span class="badge bg-light text-dark mb-1">{{ perm.permission_code }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- أزرار التحكم -->
+                    <div class="d-flex gap-2 flex-wrap mt-auto">
+                        {% if current_user.has_permission('users_edit') and current_user.can_manage_user(user) %}
+                        <a href="{{ url_for('edit_user', user_id=user.id) }}" class="btn btn-warning btn-sm shadow-sm flex-fill">
+                            <i class="fas fa-edit me-1"></i>تعديل
+                        </a>
+                        {% endif %}
+
+                        {% if current_user.has_permission('users_delete') and current_user.can_manage_user(user) and user.username != 'admin' %}
+                        <form action="{{ url_for('delete_user', user_id=user.id) }}" method="POST" class="d-inline flex-fill"
+                              onsubmit="return confirm('هل أنت متأكد من حذف المستخدم {{ user.fullname }}؟');">
+                            <button type="submit" class="btn btn-danger btn-sm shadow-sm w-100">
+                                <i class="fas fa-trash me-1"></i>حذف
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <!-- حالة عدم وجود مستخدمين -->
+    <div class="text-center py-5">
+        <i class="fas fa-users fa-4x text-muted mb-3"></i>
+        <h4 class="text-muted">لا يوجد مستخدمون</h4>
+        <p class="text-muted">لم يتم إضافة أي مستخدمين إلى النظام بعد</p>
+        {% if current_user.has_permission('users_add') %}
+        <a href="{{ url_for('add_user') }}" class="btn btn-success mt-2">
+            <i class="fas fa-user-plus me-2"></i>إضافة أول مستخدم
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
 </div>
-{% else %}
-<p class="text-muted text-center mt-3">لا يوجد مستخدمون</p>
-{% endif %}
 {% endblock %}
 
 {% block styles %}
 <style>
-/* ===================== ألوان البطاقات لتناسب الهيدر والفوتر ===================== */
+/* ===================== التصميم العام ===================== */
+.stat-card {
+    border-radius: 15px;
+    border: none;
+    transition: transform 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+}
+
+/* ===================== بطاقات المستخدمين ===================== */
 .user-card {
     border-radius: 15px;
     overflow: hidden;
+    border: none;
+    transition: all 0.3s ease;
 }
 
+.user-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+.user-inactive {
+    opacity: 0.7;
+    background-color: #f8f9fa;
+}
+
+/* ===================== رؤوس البطاقات حسب الدور ===================== */
 .user-card-header {
-    background: linear-gradient(90deg, #198754, #333333);
     color: #fff;
     font-weight: bold;
-    padding: 10px 15px;
-    border-bottom: 1px solid rgba(255,255,255,0.2);
-    border-radius: 15px 15px 0 0;
+    padding: 15px 20px;
+    border: none;
 }
 
+.user-card-header.admin {
+    background: linear-gradient(135deg, #dc3545, #c82333);
+}
+
+.user-card-header.supervisor {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+}
+
+.user-card-header.sub_admin {
+    background: linear-gradient(135deg, #17a2b8, #138496);
+}
+
+.user-card-header.user {
+    background: linear-gradient(135deg, #28a745, #1e7e34);
+}
+
+/* ===================== شارات الأدوار ===================== */
 .user-role-badge {
-    background-color: rgba(255, 255, 255, 0.8);
-    color: #212121;
-    font-weight: bold;
+    font-size: 0.75rem;
+    padding: 5px 10px;
+    border-radius: 20px;
 }
 
-/* تمييز أيقونة المستخدم */
-.user-card-header span:first-child {
+.user-role-badge.admin {
+    background: rgba(255,255,255,0.9);
+    color: #dc3545;
+}
+
+.user-role-badge.supervisor {
+    background: rgba(255,255,255,0.9);
+    color: #007bff;
+}
+
+.user-role-badge.sub_admin {
+    background: rgba(255,255,255,0.9);
+    color: #17a2b8;
+}
+
+.user-role-badge.user {
+    background: rgba(255,255,255,0.9);
+    color: #28a745;
+}
+
+/* ===================== معلومات المستخدم ===================== */
+.user-avatar {
+    font-size: 1.2rem;
+}
+
+.info-item {
     display: flex;
     align-items: center;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+}
+
+.info-item strong {
+    min-width: 80px;
+    margin-left: 5px;
+}
+
+.user-status {
+    display: flex;
     gap: 5px;
-    font-size: 1.1rem;
+    flex-wrap: wrap;
 }
 
-/* تأثير hover على البطاقة */
-.user-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 15px rgba(0,0,0,0.25);
-    transition: all 0.3s;
+.user-permissions {
+    border-top: 1px solid #eee;
+    padding-top: 10px;
 }
 
-/* تنسيق البريد الإلكتروني */
-.card-body p strong {
-    min-width: 100px;
-    display: inline-block;
+.permissions-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    margin-top: 5px;
 }
-.card-body p {
-    margin-bottom: 0.5rem;
+
+/* ===================== التجاوب ===================== */
+@media (max-width: 768px) {
+    .user-card-item {
+        margin-bottom: 15px;
+    }
+
+    .info-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .info-item strong {
+        min-width: auto;
+        margin-left: 0;
+        margin-bottom: 2px;
+    }
 }
 </style>
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const roleFilter = document.getElementById('roleFilter');
+    const statusFilter = document.getElementById('statusFilter');
+    const companyFilter = document.getElementById('companyFilter');
+    const searchInput = document.getElementById('searchInput');
+    const userCards = document.querySelectorAll('.user-card-item');
+
+    function filterUsers() {
+        const roleValue = roleFilter.value;
+        const statusValue = statusFilter.value;
+        const companyValue = companyFilter.value;
+        const searchValue = searchInput.value.toLowerCase();
+
+        userCards.forEach(card => {
+            const role = card.getAttribute('data-role');
+            const status = card.getAttribute('data-status');
+            const company = card.getAttribute('data-company');
+            const search = card.getAttribute('data-search');
+
+            const roleMatch = !roleValue || role === roleValue;
+            const statusMatch = !statusValue || status === statusValue;
+            const companyMatch = !companyValue || company === companyValue;
+            const searchMatch = !searchValue || search.includes(searchValue);
+
+            if (roleMatch && statusMatch && companyMatch && searchMatch) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    }
+
+    // إضافة مستمعي الأحداث
+    roleFilter.addEventListener('change', filterUsers);
+    statusFilter.addEventListener('change', filterUsers);
+    companyFilter.addEventListener('change', filterUsers);
+    searchInput.addEventListener('input', filterUsers);
+
+    // فلترة أولية
+    filterUsers();
+});
+
+// وظيفة للبحث السريع
+function quickSearch(query) {
+    const searchInput = document.getElementById('searchInput');
+    searchInput.value = query;
+    searchInput.dispatchEvent(new Event('input'));
+}
+</script>
 {% endblock %}

@@ -60,7 +60,9 @@ import os
 from flask import Flask
 
 app = Flask(__name__)
-
+# إعدادات SECRET_KEY - تأكد من وجود قيمة افتراضية
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production-12345'
+# إعدادات قاعدة البيانات للنشر
 # إعدادات قاعدة البيانات للنشر
 database_url = os.environ.get('DATABASE_URL')
 if database_url:
@@ -74,9 +76,6 @@ else:
     instance_path = os.path.join(basedir, 'instance')
     os.makedirs(instance_path, exist_ok=True)
     app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(instance_path, 'database.db')}"
-
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # تأكد أن db مستورد من models بشكل صحيح
 from models import db
@@ -92,10 +91,9 @@ def debug_users():
 
 # تهيئة قاعدة البيانات وتسجيل الدخول
 
+# ⚠️ إصلاح Flask-Login - التهيئة الصحيحة
 
-login_manager = LoginManager(app)
-login_manager.login_view = 'login'
-migrate = Migrate(app, db)
+
 # التحقق من وجود قاعدة البيانات
 if __name__ == "__main__":
     with app.app_context():
@@ -170,10 +168,26 @@ class CompanyForm(FlaskForm):
     active = SelectField('نشطة', choices=[('1', 'نعم'), ('0', 'لا')], default='1')
     submit = SubmitField('حفظ')
 
+
+from flask_wtf import FlaskForm
+from wtforms import StringField, PasswordField, SelectField, SubmitField
+from wtforms.validators import DataRequired
+from models import Company  # تأكد من استيراد نموذج Company
+
+
 class LoginForm(FlaskForm):
     username = StringField('اسم المستخدم', validators=[DataRequired()])
     password = PasswordField('كلمة المرور', validators=[DataRequired()])
+    company = SelectField('الشركة', coerce=int, validators=[DataRequired()])
     submit = SubmitField('تسجيل الدخول')
+
+    def __init__(self, *args, **kwargs):
+        super(LoginForm, self).__init__(*args, **kwargs)
+        # جلب الشركات النشطة فقط
+        self.company.choices = [(0, '-- اختر الشركة --')] + [
+            (company.id, company.name)
+            for company in Company.query.filter_by(active=True).order_by(Company.name).all()
+        ]
 
 from wtforms import SelectMultipleField
 class UserForm(FlaskForm):
@@ -263,17 +277,21 @@ class LocationSelectionForm(FlaskForm):
     submit = SubmitField('تحميل المعايير')
 
 
-
-
-# ====== ROUTES ======
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = 'login'  # صفحة تسجيل الدخول
-
+login_manager.login_view = 'login'
+login_manager.session_protection = "strong"
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    from models import User  # استيراد هنا لتجنب التبعيات الدائرية
+    return db.session.get(User, int(user_id))
+
+
+
+
+# ====== ROUTES ======
+
 
 @app.route('/')
 def index():
@@ -969,29 +987,137 @@ def calculate_percentage_change(current, previous):
         return 100 if current > 0 else 0
     return round(((current - previous) / previous) * 100, 1)
 
+@app.route('/users_dashboard')
+@login_required
+def users_dashboard():
+    """توجيه كل مستخدم إلى الداشبورد المناسب له"""
+    return redirect(url_for(current_user.get_dashboard_url()))
+
+
 @app.route('/user_dashboard')
 @login_required
 def user_dashboard():
     return render_template('user/dashboard.html', users=users)
+# ديكورات تحكم الوصول للصفحات
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_admin:
+            flash('هذه الصفحة للمسؤولين فقط', 'danger')
+            return redirect(url_for('user_dashboard'))
+        return f(*args, **kwargs)
+    return decorated_function
 
+
+@app.route('/manager_dashboard')
+@login_required
+def manager_dashboard():
+    """داشبورد مدير الشؤون - يرى شركته فقط"""
+    if current_user.role != 'supervisor':
+        flash('غير مصرح لك بالوصول إلى هذه الصفحة', 'danger')
+        return redirect(url_for('user_dashboard'))
+
+    if not current_user.company_id:
+        flash('لم يتم تعيين شركة لك، يرجى التواصل مع المسؤول', 'danger')
+        return redirect(url_for('logout'))
+
+    # إحصائيات شركة المستخدم فقط
+    company = Company.query.get(current_user.company_id)
+    if not company:
+        flash('الشركة غير موجودة', 'danger')
+        return redirect(url_for('logout'))
+
+    # المستخدمين في نفس الشركة
+    company_users = User.query.filter_by(company_id=current_user.company_id, active=True).count()
+
+    # التقييمات في نفس الشركة
+    company_evaluations = Evaluation.query.join(User).filter(
+        User.company_id == current_user.company_id
+    ).count()
+
+    # التقييمات الحديثة للشركة
+    recent_evaluations = Evaluation.query.join(User).filter(
+        User.company_id == current_user.company_id
+    ).order_by(Evaluation.date.desc()).limit(10).all()
+
+    return render_template('manager/dashboard.html',
+                           dashboard_type='manager',
+                           company=company,
+                           company_users=company_users,
+                           company_evaluations=company_evaluations,
+                           recent_evaluations=recent_evaluations)
+
+
+@app.route('/sub_admin_dashboard')
+@login_required
+def sub_admin_dashboard():
+    """داشبورد المشرف الفرعي - يرى شركته مع صلاحيات محددة"""
+    if current_user.role != 'sub_admin':
+        flash('غير مصرح لك بالوصول إلى هذه الصفحة', 'danger')
+        return redirect(url_for('user_dashboard'))
+
+    if not current_user.company_id:
+        flash('لم يتم تعيين شركة لك، يرجى التواصل مع المسؤول', 'danger')
+        return redirect(url_for('logout'))
+
+    company = Company.query.get(current_user.company_id)
+    if not company:
+        flash('الشركة غير موجودة', 'danger')
+        return redirect(url_for('logout'))
+
+    # إحصائيات محدودة للمشرف الفرعي
+    company_users = User.query.filter_by(
+        company_id=current_user.company_id,
+        active=True,
+        role='user'  # يرى المستخدمين العاديين فقط
+    ).count()
+
+    # التقييمات الخاصة به فقط
+    user_evaluations = Evaluation.query.filter_by(user_id=current_user.id).count()
+
+    # التقييمات الحديثة الخاصة به
+    recent_evaluations = Evaluation.query.filter_by(user_id=current_user.id) \
+        .order_by(Evaluation.date.desc()).limit(10).all()
+
+    return render_template('sub_admin/dashboard.html',
+                           dashboard_type='sub_admin',
+                           company=company,
+                           company_users=company_users,
+                           user_evaluations=user_evaluations,
+                           recent_evaluations=recent_evaluations)
+# صفحة تسجيل الدخول
 # صفحة تسجيل الدخول
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     form = LoginForm()
+
     if form.validate_on_submit():
-        user = User.query.filter_by(username=form.username.data).first()
+        # البحث عن المستخدم مع مراعاة الشركة
+        user = User.query.filter_by(
+            username=form.username.data,
+            company_id=form.company.data
+        ).first()
+
         if user:
             if user.check_password(form.password.data):
                 if user.active:
                     login_user(user)
                     flash('تم تسجيل الدخول بنجاح', 'success')
-                    return redirect(url_for('index'))  # توجه الصفحة الرئيسية حسب الدور
+
+                    # توجيه المستخدم حسب الدور
+                    if user.role == 'admin':
+                        return redirect(url_for('dashboard'))
+                    elif user.role in ['supervisor', 'sub_admin']:
+                        return redirect(url_for('company_dashboard'))
+                    else:
+                        return redirect(url_for('user_dashboard'))
                 else:
                     flash('الحساب غير نشط', 'danger')
             else:
                 flash('كلمة المرور غير صحيحة', 'danger')
         else:
-            flash('اسم المستخدم غير موجود', 'danger')
+            flash('اسم المستخدم غير موجود في هذه الشركة', 'danger')
+
     return render_template('admin/login.html', form=form)
 
 # تسجيل الخروج

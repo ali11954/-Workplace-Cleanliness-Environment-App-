@@ -56,7 +56,7 @@ class UserPermission(db.Model):
     permission_code = db.Column(db.String(50), nullable=False)
     granted_at = db.Column(db.DateTime, default=db.func.now())
 
-    user = db.relationship('User', backref='user_permissions')
+    user = db.relationship('User', back_populates='user_permissions')
 
 
 # تحديث نموذج User الحالي
@@ -77,6 +77,8 @@ class User(db.Model, UserMixin):
     company = db.relationship('Company', back_populates='users')
     regions = db.relationship('Location', secondary=user_regions, backref='users')
 
+    # إضافة العلاقة مع الصلاحيات المخصصة
+    user_permissions = db.relationship('UserPermission', back_populates='user', lazy=True, cascade='all, delete-orphan')
 
     def set_password(self, pw):
         self.password_hash = generate_password_hash(pw)
@@ -113,7 +115,8 @@ class User(db.Model, UserMixin):
 
         print("   ❌ المستخدم ليس مسؤولاً")
         return False
-    # دوال الصلاحيات الجديدة
+
+    # ========== دوال الصلاحيات الجديدة والمحدثة ==========
 
     @property
     def all_permissions(self):
@@ -137,18 +140,34 @@ class User(db.Model, UserMixin):
                 'users_view', 'users_add', 'users_edit', 'users_delete',
                 'evaluations_view', 'evaluations_add', 'evaluations_edit', 'evaluations_delete',
                 'reports_view', 'reports_export', 'settings_view', 'settings_edit',
-                'manage_permissions', 'companies_manage'
+                'manage_permissions', 'companies_manage',
+                'authorities_view', 'authorities_manage',
+                'locations_view', 'locations_manage',
+                'criteria_view', 'criteria_manage',
+                'dashboard_admin'
             ],
             'supervisor': [
                 'users_view', 'users_add', 'users_edit',
                 'evaluations_view', 'evaluations_add', 'evaluations_edit',
-                'reports_view', 'reports_export'
+                'reports_view', 'reports_export',
+                'authorities_view',
+                'locations_view',
+                'criteria_view',
+                'dashboard_manager'
             ],
             'sub_admin': [
-                'users_view', 'evaluations_view', 'reports_view'
+                'users_view',
+                'evaluations_view', 'evaluations_add',
+                'reports_view',
+                'authorities_view',
+                'locations_view',
+                'criteria_view',
+                'dashboard_sub_admin'
             ],
             'user': [
-                'evaluations_view'
+                'evaluations_view',
+                'reports_view',
+                'dashboard_user'
             ]
         }
 
@@ -156,14 +175,14 @@ class User(db.Model, UserMixin):
 
     def has_permission(self, permission_code):
         """التحقق من وجود صلاحية معينة"""
-        if self.is_admin:
+        if self.is_admin or self.role == 'admin':
             return True  # للمسؤولين صلاحيات كاملة
 
         return permission_code in self.all_permissions
 
     def can_access_company(self, company_id):
         """التحقق من إمكانية الوصول لشركة معينة"""
-        if self.is_admin:
+        if self.is_admin or self.role == 'admin':
             return True
         if self.role in ['supervisor', 'sub_admin'] and self.company_id:
             return self.company_id == company_id
@@ -171,12 +190,154 @@ class User(db.Model, UserMixin):
 
     def can_manage_user(self, target_user):
         """التحقق من إمكانية إدارة مستخدم آخر"""
-        if self.is_admin:
+        if self.is_admin or self.role == 'admin':
             return True
         if self.role in ['supervisor', 'sub_admin'] and self.company_id:
             return target_user.company_id == self.company_id
         return False
 
+    # ========== دوال جديدة للداشبورد ==========
+
+    @property
+    def dashboard_features(self):
+        """الحصول على البطاقات المتاحة في الداشبورد حسب الدور"""
+        features_map = {
+            'admin': [
+                {'url': 'users', 'icon': 'fa-users-cog', 'text': 'إدارة المستخدمين', 'bg': 'bg-users',
+                 'permission': 'users_view'},
+                {'url': 'companies', 'icon': 'fa-building', 'text': 'إدارة الشركات', 'bg': 'bg-companies',
+                 'permission': 'companies_manage'},
+                {'url': 'evaluations', 'icon': 'fa-clipboard-check', 'text': 'التقييمات', 'bg': 'bg-evaluations',
+                 'permission': 'evaluations_view'},
+                {'url': 'authorities', 'icon': 'fa-users', 'text': 'الجهات المسؤولة', 'bg': 'bg-authorities',
+                 'permission': 'authorities_view'},
+                {'url': 'locations', 'icon': 'fa-map-marker-alt', 'text': 'المناطق', 'bg': 'bg-locations',
+                 'permission': 'locations_view'},
+                {'url': 'criteria', 'icon': 'fa-list-check', 'text': 'معايير التقييم', 'bg': 'bg-criteria',
+                 'permission': 'criteria_view'},
+                {'url': 'report_summary', 'icon': 'fa-broom', 'text': 'تقرير المناطق', 'bg': 'bg-report-evaluation',
+                 'permission': 'reports_view'},
+                {'url': 'reports', 'icon': 'fa-file-alt', 'text': 'تقرير المستخدمين', 'bg': 'bg-report-general',
+                 'permission': 'reports_view'},
+                {'url': 'responsibility_report', 'icon': 'fa-balance-scale', 'text': 'تقرير الجهات',
+                 'bg': 'bg-report-responsibility', 'permission': 'reports_view'},
+                {'url': 'system_settings', 'icon': 'fa-cogs', 'text': 'إعدادات النظام', 'bg': 'bg-settings',
+                 'permission': 'settings_view'}
+            ],
+            'supervisor': [
+                {'url': 'users', 'icon': 'fa-users', 'text': 'إدارة المستخدمين', 'bg': 'bg-users',
+                 'permission': 'users_view'},
+                {'url': 'evaluations', 'icon': 'fa-clipboard-check', 'text': 'التقييمات', 'bg': 'bg-evaluations',
+                 'permission': 'evaluations_view'},
+                {'url': 'authorities', 'icon': 'fa-users', 'text': 'الجهات المسؤولة', 'bg': 'bg-authorities',
+                 'permission': 'authorities_view'},
+                {'url': 'locations', 'icon': 'fa-map-marker-alt', 'text': 'المناطق', 'bg': 'bg-locations',
+                 'permission': 'locations_view'},
+                {'url': 'criteria', 'icon': 'fa-list-check', 'text': 'معايير التقييم', 'bg': 'bg-criteria',
+                 'permission': 'criteria_view'},
+                {'url': 'report_summary', 'icon': 'fa-broom', 'text': 'تقرير المناطق', 'bg': 'bg-report-evaluation',
+                 'permission': 'reports_view'},
+                {'url': 'reports', 'icon': 'fa-file-alt', 'text': 'تقرير المستخدمين', 'bg': 'bg-report-general',
+                 'permission': 'reports_view'},
+                {'url': 'responsibility_report', 'icon': 'fa-balance-scale', 'text': 'تقرير الجهات',
+                 'bg': 'bg-report-responsibility', 'permission': 'reports_view'},
+                {'url': 'action_plans', 'icon': 'fa-tasks', 'text': 'خطط العمل', 'bg': 'bg-action-plans',
+                 'permission': 'evaluations_edit'}
+            ],
+            'sub_admin': [
+                {'url': 'evaluations', 'icon': 'fa-clipboard-check', 'text': 'التقييمات', 'bg': 'bg-evaluations',
+                 'permission': 'evaluations_view'},
+                {'url': 'locations', 'icon': 'fa-map-marker-alt', 'text': 'المناطق', 'bg': 'bg-locations',
+                 'permission': 'locations_view'},
+                {'url': 'report_summary', 'icon': 'fa-broom', 'text': 'تقرير المناطق', 'bg': 'bg-report-evaluation',
+                 'permission': 'reports_view'},
+                {'url': 'responsibility_report', 'icon': 'fa-balance-scale', 'text': 'تقرير الجهات',
+                 'bg': 'bg-report-responsibility', 'permission': 'reports_view'},
+                {'url': 'action_plans', 'icon': 'fa-tasks', 'text': 'خطط العمل', 'bg': 'bg-action-plans',
+                 'permission': 'evaluations_edit'},
+                {'url': 'daily_tasks', 'icon': 'fa-list-check', 'text': 'المهام اليومية', 'bg': 'bg-tasks',
+                 'permission': 'evaluations_view'},
+                {'url': 'reports_list', 'icon': 'fa-flag', 'text': 'البلاغات', 'bg': 'bg-reports',
+                 'permission': 'reports_view'}
+            ],
+            'user': [
+                {'url': 'evaluations', 'icon': 'fa-clipboard-check', 'text': 'التقييمات', 'bg': 'user-bg-evaluations',
+                 'permission': 'evaluations_view'},
+                {'url': 'report_summary', 'icon': 'fa-broom', 'text': 'تقرير المناطق',
+                 'bg': 'user-bg-report-evaluation', 'permission': 'reports_view'},
+                {'url': 'responsibility_report', 'icon': 'fa-balance-scale', 'text': 'تقرير الجهات',
+                 'bg': 'user-bg-report-responsibility', 'permission': 'reports_view'}
+            ]
+        }
+
+        # الحصول على البطاقات حسب الدور مع التحقق من الصلاحيات
+        base_features = features_map.get(self.role, features_map['user'])
+
+        # تصفية البطاقات بناءً على الصلاحيات الفعلية
+        available_features = []
+        for feature in base_features:
+            if self.has_permission(feature.get('permission', '')):
+                available_features.append(feature)
+
+        return available_features
+
+    @property
+    def dashboard_title(self):
+        """عنوان الداشبورد حسب الدور"""
+        titles = {
+            'admin': 'لوحة تحكم المسؤول العام',
+            'supervisor': 'لوحة تحكم مدير الشؤون',
+            'sub_admin': 'لوحة تحكم المشرف الفرعي',
+            'user': 'لوحة تحكم المستخدم'
+        }
+        return titles.get(self.role, 'لوحة التحكم')
+
+    @property
+    def dashboard_description(self):
+        """وصف الداشبورد حسب الدور"""
+        descriptions = {
+            'admin': 'إدارة كاملة للنظام وجميع الإعدادات',
+            'supervisor': 'إدارة العمليات والتقييمات اليومية',
+            'sub_admin': 'المهام والصلاحيات المحددة',
+            'user': 'الواجهة الأساسية للمستخدم'
+        }
+        return descriptions.get(self.role, 'الواجهة الرئيسية')
+
+    @property
+    def role_badge_style(self):
+        """نمط شارة الدور"""
+        styles = {
+            'admin': {'background': 'linear-gradient(45deg, #198754, #20c997)', 'icon': 'fa-crown'},
+            'supervisor': {'background': 'linear-gradient(45deg, #007bff, #0056b3)', 'icon': 'fa-user-tie'},
+            'sub_admin': {'background': 'linear-gradient(45deg, #fd7e14, #e44d26)', 'icon': 'fa-user-shield'},
+            'user': {'background': 'linear-gradient(45deg, #6c757d, #495057)', 'icon': 'fa-user'}
+        }
+        return styles.get(self.role, styles['user'])
+
+    def get_accessible_companies(self):
+        """الحصول على الشركات التي يمكن للمستخدم الوصول إليها"""
+        from models import Company  # تجنب الاستيراد الدائري
+
+        if self.is_admin or self.role == 'admin':
+            return Company.query.filter_by(active=True).all()
+        elif self.company_id:
+            return Company.query.filter_by(id=self.company_id, active=True).all()
+        else:
+            return []
+
+    def get_dashboard_url(self):
+        """الحصول على رابط الداشبورد المناسب"""
+        if self.role == 'admin':
+            return 'admin_dashboard'
+        elif self.role == 'supervisor':
+            return 'manager_dashboard'
+        elif self.role == 'sub_admin':
+            return 'sub_admin_dashboard'
+        else:
+            return 'user_dashboard'
+
+    def __repr__(self):
+        return f'<User {self.username} - {self.role}>'
 
 class Location(db.Model):
     __tablename__ = 'location'

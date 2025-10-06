@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}لوحة تحكم المشرف الفرعي{% endblock %}
+
+{% block content %}
+<div class="main-container">
+    <div class="dashboard-header mb-4">
+        <div class="header-content">
+            <div class="app-title-section">
+                <h2 class="text-warning fw-bold">لوحة تحكم المشرف الفرعي</h2>
+                <p class="text-muted">المهام والصلاحيات المحددة</p>
+            </div>
+            <div class="user-company-section">
+                <div class="company-badge" style="background: linear-gradient(45deg, #fd7e14, #e44d26);">
+                    <i class="fas fa-user-shield me-2"></i>
+                    <span class="company-name">مشرف فرعي</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- البطاقات المحددة للمشرف الفرعي -->
+    <div class="card-container d-flex flex-wrap justify-content-center gap-3 mt-4">
+        <!-- التقييمات (محدودة) -->
+        <a href="{{ url_for('evaluations') }}" class="feature-card bg-evaluations">
+            <div class="icon-circle">
+                <i class="fas fa-clipboard-check"></i>
+            </div>
+            <div>التقييمات</div>
+        </a>
+
+        <!-- المناطق (محدودة) -->
+        <a href="{{ url_for('locations') }}" class="feature-card bg-locations">
+            <div class="icon-circle">
+                <i class="fas fa-map-marker-alt"></i>
+            </div>
+            <div>المناطق</div>
+        </a>
+
+        <!-- التقارير المحدودة -->
+        <a href="{{ url_for('report_summary') }}" class="feature-card bg-report-evaluation">
+            <div class="icon-circle">
+                <i class="fas fa-broom"></i>
+            </div>
+            <div>تقرير المناطق</div>
+        </a>
+
+        <a href="{{ url_for('responsibility_report') }}" class="feature-card bg-report-responsibility">
+            <div class="icon-circle">
+                <i class="fas fa-balance-scale"></i>
+            </div>
+            <div>تقرير الجهات</div>
+        </a>
+
+        <!-- خطط العمل (محدودة) -->
+        <a href="{{ url_for('action_plans') }}" class="feature-card bg-action-plans">
+            <div class="icon-circle">
+                <i class="fas fa-tasks"></i>
+            </div>
+            <div>خطط العمل</div>
+        </a>
+
+        <!-- المهام اليومية -->
+        <a href="{{ url_for('daily_tasks') }}" class="feature-card bg-tasks">
+            <div class="icon-circle">
+                <i class="fas fa-list-check"></i>
+            </div>
+            <div>المهام اليومية</div>
+        </a>
+
+        <!-- البلاغات -->
+        <a href="{{ url_for('reports_list') }}" class="feature-card bg-reports">
+            <div class="icon-circle">
+                <i class="fas fa-flag"></i>
+            </div>
+            <div>البلاغات</div>
+        </a>
+    </div>
+</div>
+
+<style>
+.bg-tasks { background: linear-gradient(45deg, #17a2b8, #138496); }
+.bg-reports { background: linear-gradient(45deg, #dc3545, #c82333); }
+</style>
+{% endblock %}

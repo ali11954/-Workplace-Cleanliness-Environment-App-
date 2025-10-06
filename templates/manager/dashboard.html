@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}لوحة تحكم مدير الشؤون{% endblock %}
+
+{% block content %}
+<div class="main-container">
+    <div class="dashboard-header mb-4">
+        <div class="header-content">
+            <div class="app-title-section">
+                <h2 class="text-primary fw-bold">لوحة تحكم مدير الشؤون</h2>
+                <p class="text-muted">إدارة العمليات والتقييمات اليومية</p>
+            </div>
+            <div class="user-company-section">
+                <div class="company-badge" style="background: linear-gradient(45deg, #007bff, #0056b3);">
+                    <i class="fas fa-user-tie me-2"></i>
+                    <span class="company-name">مدير الشؤون</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- البطاقات المتاحة لمدير الشؤون -->
+    <div class="card-container d-flex flex-wrap justify-content-center gap-3 mt-4">
+        <!-- إدارة المستخدمين (محدودة) -->
+        <a href="{{ url_for('users') }}" class="feature-card bg-users">
+            <div class="icon-circle">
+                <i class="fas fa-users"></i>
+            </div>
+            <div>إدارة المستخدمين</div>
+        </a>
+
+        <!-- التقييمات -->
+        <a href="{{ url_for('evaluations') }}" class="feature-card bg-evaluations">
+            <div class="icon-circle">
+                <i class="fas fa-clipboard-check"></i>
+            </div>
+            <div>التقييمات</div>
+        </a>
+
+        <!-- الجهات المسؤولة -->
+        <a href="{{ url_for('authorities') }}" class="feature-card bg-authorities">
+            <div class="icon-circle">
+                <i class="fas fa-users"></i>
+            </div>
+            <div>الجهات المسؤولة</div>
+        </a>
+
+        <!-- المناطق -->
+        <a href="{{ url_for('locations') }}" class="feature-card bg-locations">
+            <div class="icon-circle">
+                <i class="fas fa-map-marker-alt"></i>
+            </div>
+            <div>المناطق</div>
+        </a>
+
+        <!-- التقارير -->
+        <a href="{{ url_for('report_summary') }}" class="feature-card bg-report-evaluation">
+            <div class="icon-circle">
+                <i class="fas fa-broom"></i>
+            </div>
+            <div>تقرير المناطق</div>
+        </a>
+
+        <a href="{{ url_for('reports') }}" class="feature-card bg-report-general">
+            <div class="icon-circle">
+                <i class="fas fa-file-alt"></i>
+            </div>
+            <div>تقرير المستخدمين</div>
+        </a>
+
+        <a href="{{ url_for('responsibility_report') }}" class="feature-card bg-report-responsibility">
+            <div class="icon-circle">
+                <i class="fas fa-balance-scale"></i>
+            </div>
+            <div>تقرير الجهات</div>
+        </a>
+
+        <!-- خطط العمل -->
+        <a href="{{ url_for('action_plans') }}" class="feature-card bg-action-plans">
+            <div class="icon-circle">
+                <i class="fas fa-tasks"></i>
+            </div>
+            <div>خطط العمل</div>
+        </a>
+    </div>
+</div>
+
+<style>
+.bg-action-plans { background: linear-gradient(45deg, #20c997, #198754); }
+</style>
+{% endblock %}

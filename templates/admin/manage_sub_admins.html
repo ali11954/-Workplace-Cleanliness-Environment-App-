@@ -1,7 +1,10 @@
-<!DOCTYPE html>
-<html lang="ar">
-<head>
-    <meta charset="UTF-8">
+{% extends "base.html" %}
+
+{% block title %}إدارة صلاحيات المشرفين الفرعيين{% endblock %}
+
+{% block content %}
+
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>إدارة المشرفين الفرعيين</title>
     <style>
@@ -96,8 +99,6 @@
             color: #6c757d;
         }
     </style>
-</head>
-<body>
     <div class="container">
         <div class="header">
             <h1>🎯 إدارة المشرفين الفرعيين</h1>
@@ -193,5 +194,4 @@
             <a href="/dashboard" class="btn btn-primary">← العودة للوحة التحكم</a>
         </div>
     </div>
-</body>
-</html>
+{% endblock %}
