@@ -127,7 +127,7 @@
       {% if current_user.is_authenticated and current_user.company %}
       <div class="company-badge">
         <i class="fas fa-building me-1"></i>
-        {{ current_user.company.name }}
+        {{ current_user.company.code }}
       </div>
       {% elif current_user.is_authenticated %}
       <div class="company-badge" style="background: linear-gradient(45deg, #6c757d, #495057);">

@@ -1,97 +1,48 @@
-from flask import Flask, render_template, redirect, url_for, request, flash, send_file
+# ====== 1️⃣ الاستيرادات الأساسية ======
+from flask import Flask, render_template, redirect, url_for, request, flash, jsonify, send_file
 from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from flask_login import LoginManager, current_user, login_user, logout_user, login_required
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_wtf import FlaskForm
-from models import Evaluation, Location, EvaluationAuthority, Criterion, Place, Site, Location, User, EvaluationDetail, ActionPlan
-from flask import request
-from sqlalchemy import func
-from wtforms import StringField, PasswordField, SubmitField, IntegerField, SelectField, TextAreaField
-from wtforms.validators import DataRequired, Length, NumberRange, EqualTo, Optional
+from wtforms import StringField, PasswordField, SubmitField, SelectField, IntegerField, TextAreaField, FloatField
+from wtforms.validators import DataRequired, Length, EqualTo, NumberRange, Optional
 from datetime import datetime
-from collections import defaultdict
-import io
 from functools import wraps
-from flask import redirect, url_for, flash
-from flask_login import current_user
-from sqlalchemy import func, distinct
-from wtforms import   FloatField
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.pagesizes import A4
-from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.pdfbase.ttfonts import TTFont
+import os
 from reportlab.pdfbase import pdfmetrics
-import arabic_reshaper
-from bidi.algorithm import get_display
-import os
-from flask import  jsonify
-from flask_migrate import Migrate
-from flask import jsonify
-from flask_wtf import FlaskForm
-from wtforms import  IntegerField, SubmitField
-from wtforms.validators import DataRequired, NumberRange
-from flask_wtf import FlaskForm
-from wtforms import SelectField, TextAreaField, SubmitField
-from wtforms.validators import DataRequired
-from wtforms import IntegerField
-from wtforms.validators import InputRequired, NumberRange
-from sqlalchemy.orm import joinedload
-from flask import Flask, render_template
-from flask_login import login_required
-from sqlalchemy import func
-from sqlalchemy.orm import joinedload
-from flask_sqlalchemy import SQLAlchemy
-from models import db  # أو من مكانك الصحيح حسب مشروعك
-from models import User
-# في الأعلى مع بقية الاستدعاءات
-from models import EvaluationAuthority,Company,UserPermission,Permission
+from reportlab.pdfbase.ttfonts import TTFont
+from sqlalchemy import func, distinct
 
+# ====== 2️⃣ تحميل الإعدادات من config.py ======
+from config import Config
 
+# ====== 3️⃣ استيراد قاعدة البيانات والنماذج ======
+from models import db, User, Company, Location, Site, Place, Criterion, Evaluation, EvaluationDetail, EvaluationAuthority, UserPermission, Permission
 
-from flask import Flask
-from models import db ,Location,Site,Place,Criterion,Evaluation,EvaluationDetail  # ← استيراد db من models فقط
-
-
-
-
-# في بداية الملف بعد الاستيرادات
-import os
-from flask import Flask
-
+# ====== 4️⃣ إنشاء التطبيق وتهيئته ======
 app = Flask(__name__)
-# إعدادات SECRET_KEY - تأكد من وجود قيمة افتراضية
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production-12345'
-# إعدادات قاعدة البيانات للنشر
-# إعدادات قاعدة البيانات للنشر
-database_url = os.environ.get('DATABASE_URL')
-if database_url:
-    # تحويل من postgres إلى postgresql لـ SQLAlchemy
-    if database_url.startswith('postgres://'):
-        database_url = database_url.replace('postgres://', 'postgresql://', 1)
-    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-else:
-    # للتطوير المحلي
-    basedir = os.path.abspath(os.path.dirname(__file__))
-    instance_path = os.path.join(basedir, 'instance')
-    os.makedirs(instance_path, exist_ok=True)
-    app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(instance_path, 'database.db')}"
+app.config.from_object(Config)
 
-# تأكد أن db مستورد من models بشكل صحيح
-from models import db
+# تهيئة قاعدة البيانات
 db.init_app(app)
+
+# ====== 5️⃣ إعداد Flask-Login ======
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+login_manager.session_protection = "strong"
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+# ====== 6️⃣ بقية الكود (decorators, forms, routes ...) ======
 
 
 @app.route("/debug-users")
 def debug_users():
     users = User.query.all()
     return "<br>".join([f"{u.username} - {u.email} - {u.role}" for u in users])
-
-# إنشاء تطبيق Flask
-
-# تهيئة قاعدة البيانات وتسجيل الدخول
-
-# ⚠️ إصلاح Flask-Login - التهيئة الصحيحة
 
 
 # تسجيل خط Amiri
@@ -270,15 +221,6 @@ class LocationSelectionForm(FlaskForm):
     submit = SubmitField('تحميل المعايير')
 
 
-login_manager = LoginManager()
-login_manager.init_app(app)
-login_manager.login_view = 'login'
-login_manager.session_protection = "strong"
-
-@login_manager.user_loader
-def load_user(user_id):
-    from models import User  # استيراد هنا لتجنب التبعيات الدائرية
-    return User.query.get(int(user_id))
 
 
 # ====== ROUTES ======
@@ -3347,8 +3289,7 @@ def initialize_database():
             # إنشاء المستخدم الافتراضي
             if not User.query.filter_by(username='admin').first():
                 admin = User(
-                    fullname='المشرف الرئيسي',
-                    username='admin',
+                   username='admin',
                     email='admin@system.com',
                     role='admin',
                     company_id=yemen_sugar_company.id,
@@ -3373,4 +3314,5 @@ if __name__ == "__main__":
         print("تم الاتصال بقاعدة البيانات بنجاح")
 
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(host="0.0.0.0", port=5000, debug=True)
+
