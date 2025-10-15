@@ -1,58 +1,519 @@
 {% extends 'admin/dashboard.html' %}
 {% block content %}
-<div class="container mt-4">
-    <h4>التسلسل الهرمي للمعايير</h4>
-    <ul class="list-group">
-        {% for region in regions %}
-        <li class="list-group-item">
-            <strong>{{ region.name }}</strong>
-            {% set region_sites = region.sites %}
-            {% if region_sites %}
-            <ul class="list-group mt-2 ms-3">
-                {% for site in region_sites %}
-                <li class="list-group-item">
-                    {{ site.name }}
-                    {% set site_places = site.places %}
-                    {% if site_places %}
-                    <ul class="list-group mt-2 ms-3">
-                        {% for place in site_places %}
-                        <li class="list-group-item">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <span>🏠 {{ place.name }}</span>
-                                <a href="{{ url_for('add_criterion', place_id=place.id) }}" class="btn btn-sm btn-outline-primary">إضافة معيار</a>
+<div class="container-fluid py-4">
+    <!-- رأس الصفحة -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <div>
+            <h1 class="h3 mb-0 text-gray-800">
+                <i class="fas fa-sitemap me-2 text-primary"></i>التسلسل الهرمي للمعايير
+            </h1>
+            <p class="text-muted mb-0">عرض الهيكل التنظيمي الكامل للمعايير حسب المناطق والمواقع والأماكن</p>
+        </div>
+        <div class="btn-group">
+            <a href="{{ url_for('criteria') }}" class="btn btn-primary shadow-sm">
+                <i class="fas fa-list me-2"></i>إدارة المعايير
+            </a>
+            <button class="btn btn-outline-secondary shadow-sm" onclick="toggleAll()" id="toggleBtn">
+                <i class="fas fa-expand me-2"></i>فتح الكل
+            </button>
+        </div>
+    </div>
+
+    <!-- إحصائيات سريعة -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs fw-bold text-primary text-uppercase mb-1">
+                                المناطق
                             </div>
-                            {% set criteria = place.criteria %}
-                            {% if criteria %}
-                            <ul class="list-group mt-2 ms-3">
-                                {% for crit in criteria %}
-                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    {{ crit.name }} ({{ crit.min_score }} - {{ crit.max_score }})
-                                    <div>
-                                        <a href="{{ url_for('edit_criterion', criterion_id=crit.id) }}" class="btn btn-sm btn-warning">تعديل</a>
-                                        <form action="{{ url_for('delete_criterion', criterion_id=crit.id) }}" method="post" style="display:inline-block;">
-                                            <button class="btn btn-sm btn-danger" onclick="return confirm('هل أنت متأكد؟')">حذف</button>
-                                        </form>
-                                    </div>
-                                </li>
+                            <div class="h5 mb-0 fw-bold text-gray-800">{{ regions|length }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-map-marker-alt fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs fw-bold text-success text-uppercase mb-1">
+                                إجمالي المعايير
+                            </div>
+                            <div class="h5 mb-0 fw-bold text-gray-800">
+                                {% set total_criteria = [] %}
+                                {% for region in regions %}
+                                    {% for site in region.sites %}
+                                        {% for place in site.places %}
+                                            {% set _ = total_criteria.append(place.criteria|length) %}
+                                        {% endfor %}
+                                    {% endfor %}
                                 {% endfor %}
-                            </ul>
-                            {% else %}
-                            <small class="text-muted ms-3">لا توجد معايير</small>
-                            {% endif %}
-                        </li>
+                                {{ total_criteria|sum }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-list-alt fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs fw-bold text-info text-uppercase mb-1">
+                                الأماكن النشطة
+                            </div>
+                            <div class="h5 mb-0 fw-bold text-gray-800">
+                                {% set active_places = [] %}
+                                {% for region in regions %}
+                                    {% for site in region.sites %}
+                                        {% for place in site.places %}
+                                            {% if place.criteria %}
+                                                {% set _ = active_places.append(1) %}
+                                            {% endif %}
+                                        {% endfor %}
+                                    {% endfor %}
+                                {% endfor %}
+                                {{ active_places|sum }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-building fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs fw-bold text-warning text-uppercase mb-1">
+                                الأماكن بدون معايير
+                            </div>
+                            <div class="h5 mb-0 fw-bold text-gray-800">
+                                {% set inactive_places = [] %}
+                                {% for region in regions %}
+                                    {% for site in region.sites %}
+                                        {% for place in site.places %}
+                                            {% if not place.criteria %}
+                                                {% set _ = inactive_places.append(1) %}
+                                            {% endif %}
+                                        {% endfor %}
+                                    {% endfor %}
+                                {% endfor %}
+                                {{ inactive_places|sum }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-exclamation-circle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- البحث والتصفية -->
+    <div class="card shadow mb-4">
+        <div class="card-header bg-light py-3">
+            <h6 class="m-0 fw-bold text-primary">
+                <i class="fas fa-search me-2"></i>البحث والتصفية
+            </h6>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <input type="text" id="searchInput" class="form-control" placeholder="ابحث في المعايير والأماكن...">
+                </div>
+                <div class="col-md-3">
+                    <select id="filterRegion" class="form-select">
+                        <option value="">جميع المناطق</option>
+                        {% for region in regions %}
+                        <option value="{{ region.name }}">{{ region.name }}</option>
                         {% endfor %}
-                    </ul>
-                    {% else %}
-                    <div class="text-muted ms-3">لا توجد أماكن</div>
-                    {% endif %}
-                </li>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <select id="filterCriteria" class="form-select">
+                        <option value="">جميع الأماكن</option>
+                        <option value="with_criteria">أماكن بها معايير</option>
+                        <option value="without_criteria">أماكن بدون معايير</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- الهيكل الهرمي -->
+    <div class="card shadow">
+        <div class="card-header bg-light py-3">
+            <h6 class="m-0 fw-bold text-primary">
+                <i class="fas fa-network-wired me-2"></i>الهيكل التنظيمي
+            </h6>
+        </div>
+        <div class="card-body">
+            {% if regions %}
+            <div class="hierarchy-container" id="hierarchyContainer">
+                {% for region in regions %}
+                <div class="region-card mb-4" data-region="{{ region.name }}">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-3"
+                             data-bs-toggle="collapse" data-bs-target="#region{{ region.id }}"
+                             style="cursor: pointer;">
+                            <div class="d-flex align-items-center">
+                                <div class="region-icon me-3">
+                                    <i class="fas fa-map-marker-alt fa-lg"></i>
+                                </div>
+                                <div>
+                                    <h5 class="mb-0 fw-bold">{{ region.name }}</h5>
+                                    <small class="opacity-75">
+                                        <i class="fas fa-landmark me-1"></i>
+                                        {{ region.company.name if region.company else 'غير محدد' }}
+                                    </small>
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center">
+                                <span class="badge bg-light text-dark me-3">
+                                    {{ region.sites|length }} مواقع
+                                </span>
+                                <i class="fas fa-chevron-down transition-icon"></i>
+                            </div>
+                        </div>
+
+                        <div class="collapse show" id="region{{ region.id }}">
+                            <div class="card-body">
+                                {% if region.sites %}
+                                <div class="sites-container">
+                                    {% for site in region.sites %}
+                                    <div class="site-card mb-3">
+                                        <div class="card border-0 shadow-sm">
+                                            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center py-2"
+                                                 data-bs-toggle="collapse" data-bs-target="#site{{ site.id }}"
+                                                 style="cursor: pointer;">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="site-icon me-3">
+                                                        <i class="fas fa-location-arrow fa-lg"></i>
+                                                    </div>
+                                                    <h6 class="mb-0 fw-bold">{{ site.name }}</h6>
+                                                </div>
+                                                <div class="d-flex align-items-center">
+                                                    <span class="badge bg-light text-dark me-3">
+                                                        {{ site.places|length }} أماكن
+                                                    </span>
+                                                    <i class="fas fa-chevron-down transition-icon"></i>
+                                                </div>
+                                            </div>
+
+                                            <div class="collapse show" id="site{{ site.id }}">
+                                                <div class="card-body">
+                                                    {% if site.places %}
+                                                    <div class="places-container">
+                                                        {% for place in site.places %}
+                                                        <div class="place-card mb-3"
+                                                             data-criteria-status="{% if place.criteria %}with_criteria{% else %}without_criteria{% endif %}">
+                                                            <div class="card border-0 shadow-sm">
+                                                                <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center py-2"
+                                                                     data-bs-toggle="collapse" data-bs-target="#place{{ place.id }}"
+                                                                     style="cursor: pointer;">
+                                                                    <div class="d-flex align-items-center">
+                                                                        <div class="place-icon me-3">
+                                                                            <i class="fas fa-building fa-lg"></i>
+                                                                        </div>
+                                                                        <h6 class="mb-0 fw-bold">{{ place.name }}</h6>
+                                                                    </div>
+                                                                    <div class="d-flex align-items-center gap-2">
+                                                                        <span class="badge bg-{% if place.criteria %}success{% else %}danger{% endif %}">
+                                                                            {{ place.criteria|length }} معايير
+                                                                        </span>
+                                                                        <a href="{{ url_for('criteria') }}?place_id={{ place.id }}"
+                                                                           class="btn btn-sm btn-outline-primary"
+                                                                           title="إضافة معيار">
+                                                                            <i class="fas fa-plus"></i>
+                                                                        </a>
+                                                                        <i class="fas fa-chevron-down transition-icon"></i>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div class="collapse" id="place{{ place.id }}">
+                                                                    <div class="card-body">
+                                                                        {% if place.criteria %}
+                                                                        <div class="criteria-container">
+                                                                            <h6 class="fw-bold text-muted mb-3">المعايير:</h6>
+                                                                            <div class="row g-3">
+                                                                                {% for crit in place.criteria %}
+                                                                                <div class="col-lg-6">
+                                                                                    <div class="card criterion-card border-0 shadow-sm h-100">
+                                                                                        <div class="card-body">
+                                                                                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                                                                                <h6 class="fw-bold text-dark mb-0">{{ crit.name }}</h6>
+                                                                                                <div class="btn-group btn-group-sm">
+                                                                                                    <a href="{{ url_for('edit_criterion', criterion_id=crit.id) }}"
+                                                                                                       class="btn btn-outline-warning" title="تعديل">
+                                                                                                        <i class="fas fa-edit"></i>
+                                                                                                    </a>
+                                                                                                    <form action="{{ url_for('delete_criterion', criterion_id=crit.id) }}"
+                                                                                                          method="post" class="d-inline">
+                                                                                                        <button type="submit"
+                                                                                                                class="btn btn-outline-danger"
+                                                                                                                title="حذف"
+                                                                                                                onclick="return confirm('هل أنت متأكد من حذف المعيار {{ crit.name }}؟')">
+                                                                                                            <i class="fas fa-trash"></i>
+                                                                                                        </button>
+                                                                                                    </form>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                            <div class="row g-2">
+                                                                                                <div class="col-6">
+                                                                                                    <small class="text-muted">الدرجة:</small>
+                                                                                                    <div>
+                                                                                                        <span class="badge bg-success">{{ crit.min_score }}</span>
+                                                                                                        <span class="mx-1">-</span>
+                                                                                                        <span class="badge bg-danger">{{ crit.max_score }}</span>
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                                <div class="col-6">
+                                                                                                    <small class="text-muted">الجهة:</small>
+                                                                                                    <div class="fw-bold text-info">
+                                                                                                        {{ crit.authority.name if crit.authority else 'غير محدد' }}
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                                {% endfor %}
+                                                                            </div>
+                                                                        </div>
+                                                                        {% else %}
+                                                                        <div class="text-center py-4">
+                                                                            <i class="fas fa-list-alt fa-3x text-muted mb-3"></i>
+                                                                            <h6 class="text-muted">لا توجد معايير</h6>
+                                                                            <p class="text-muted mb-3">لم يتم إضافة أي معايير لهذا المكان</p>
+                                                                            <a href="{{ url_for('criteria') }}?place_id={{ place.id }}"
+                                                                               class="btn btn-primary btn-sm">
+                                                                                <i class="fas fa-plus me-2"></i>إضافة معيار أول
+                                                                            </a>
+                                                                        </div>
+                                                                        {% endif %}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        {% endfor %}
+                                                    </div>
+                                                    {% else %}
+                                                    <div class="text-center py-4">
+                                                        <i class="fas fa-building fa-3x text-muted mb-3"></i>
+                                                        <h6 class="text-muted">لا توجد أماكن</h6>
+                                                        <p class="text-muted">لم يتم إضافة أي أماكن لهذا الموقع</p>
+                                                    </div>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% else %}
+                                <div class="text-center py-4">
+                                    <i class="fas fa-location-arrow fa-3x text-muted mb-3"></i>
+                                    <h6 class="text-muted">لا توجد مواقع</h6>
+                                    <p class="text-muted">لم يتم إضافة أي مواقع لهذه المنطقة</p>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 {% endfor %}
-            </ul>
+            </div>
             {% else %}
-            <div class="text-muted ms-3">لا توجد مواقع فرعية</div>
+            <div class="text-center py-5">
+                <div class="empty-state">
+                    <i class="fas fa-sitemap fa-4x text-muted mb-3"></i>
+                    <h5 class="text-muted">لا توجد مناطق</h5>
+                    <p class="text-muted mb-4">لم يتم إضافة أي مناطق بعد</p>
+                    <a href="{{ url_for('locations') }}" class="btn btn-primary">
+                        <i class="fas fa-plus me-2"></i>إضافة منطقة جديدة
+                    </a>
+                </div>
+            </div>
             {% endif %}
-        </li>
-        {% endfor %}
-    </ul>
+        </div>
+    </div>
 </div>
+{% endblock %}
+
+{% block styles %}
+<style>
+.region-icon, .site-icon, .place-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.region-icon { background: rgba(255, 255, 255, 0.2); }
+.site-icon { background: rgba(255, 255, 255, 0.2); }
+.place-icon { background: rgba(255, 255, 255, 0.2); }
+
+.transition-icon {
+    transition: transform 0.3s ease;
+}
+
+.collapsed .transition-icon {
+    transform: rotate(-90deg);
+}
+
+.criterion-card {
+    transition: all 0.3s ease;
+    border-left: 4px solid #007bff;
+}
+
+.criterion-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.empty-state {
+    padding: 40px 20px;
+}
+
+.empty-state i {
+    opacity: 0.5;
+}
+
+.card-header {
+    border-radius: 8px !important;
+}
+
+.hierarchy-container .card {
+    border-radius: 10px;
+}
+
+.btn-group-sm .btn {
+    padding: 0.25rem 0.5rem;
+}
+
+/* تأثيرات البحث */
+.search-highlight {
+    background-color: #fff3cd;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+
+.hidden-item {
+    display: none !important;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let isAllExpanded = true;
+    const toggleBtn = document.getElementById('toggleBtn');
+
+    // وظيفة فتح/غلق الكل
+    function toggleAll() {
+        const collapses = document.querySelectorAll('.collapse');
+        const icons = document.querySelectorAll('.transition-icon');
+
+        if (isAllExpanded) {
+            // غلق الكل
+            collapses.forEach(collapse => {
+                bootstrap.Collapse.getInstance(collapse)?.hide();
+            });
+            toggleBtn.innerHTML = '<i class="fas fa-compress me-2"></i>فتح الكل';
+        } else {
+            // فتح الكل
+            collapses.forEach(collapse => {
+                bootstrap.Collapse.getInstance(collapse)?.show();
+            });
+            toggleBtn.innerHTML = '<i class="fas fa-expand me-2"></i>غلق الكل';
+        }
+
+        isAllExpanded = !isAllExpanded;
+    }
+
+    // البحث في المحتوى
+    const searchInput = document.getElementById('searchInput');
+    const filterRegion = document.getElementById('filterRegion');
+    const filterCriteria = document.getElementById('filterCriteria');
+
+    function performSearch() {
+        const searchTerm = searchInput.value.toLowerCase();
+        const regionFilter = filterRegion.value;
+        const criteriaFilter = filterCriteria.value;
+
+        document.querySelectorAll('.region-card, .site-card, .place-card').forEach(item => {
+            let showItem = true;
+            const textContent = item.textContent.toLowerCase();
+
+            // تطبيق البحث
+            if (searchTerm && !textContent.includes(searchTerm)) {
+                showItem = false;
+            }
+
+            // تطبيق فلترة المنطقة
+            if (regionFilter && item.closest('.region-card')) {
+                const regionName = item.closest('.region-card').dataset.region;
+                if (regionName !== regionFilter) {
+                    showItem = false;
+                }
+            }
+
+            // تطبيق فلترة المعايير
+            if (criteriaFilter && item.classList.contains('place-card')) {
+                const criteriaStatus = item.dataset.criteriaStatus;
+                if (criteriaFilter === 'with_criteria' && criteriaStatus !== 'with_criteria') {
+                    showItem = false;
+                } else if (criteriaFilter === 'without_criteria' && criteriaStatus !== 'without_criteria') {
+                    showItem = false;
+                }
+            }
+
+            // إظهار/إخفاء العنصر
+            if (showItem) {
+                item.classList.remove('hidden-item');
+                // فتح العناصر التي تحتوي على نتائج بحث
+                const collapse = item.querySelector('.collapse');
+                if (collapse && searchTerm && textContent.includes(searchTerm)) {
+                    bootstrap.Collapse.getInstance(collapse)?.show();
+                }
+            } else {
+                item.classList.add('hidden-item');
+            }
+        });
+    }
+
+    // أحداث البحث والتصفية
+    searchInput.addEventListener('input', performSearch);
+    filterRegion.addEventListener('change', performSearch);
+    filterCriteria.addEventListener('change', performSearch);
+
+    // تفعيل أدوات التلميح
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    });
+});
+</script>
 {% endblock %}

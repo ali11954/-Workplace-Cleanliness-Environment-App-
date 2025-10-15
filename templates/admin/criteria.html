@@ -2,127 +2,411 @@
 {% block title %}إدارة المعايير{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <h2 class="mb-4 text-center">إدارة المعايير</h2>
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- رأس الصفحة -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0 text-gray-800">
+                    <i class="fas fa-list-alt me-2"></i>إدارة المعايير
+                </h1>
+                <a href="{{ url_for('criteria_hierarchy') }}" class="btn btn-outline-primary">
+                    <i class="fas fa-sitemap me-2"></i>عرض الهيكل التنظيمي
+                </a>
+            </div>
 
-    <!-- نموذج إضافة معيار -->
-    <form method="post" class="mb-4 p-3 border rounded bg-light shadow-sm">
-        <div class="row g-3 align-items-end">
-            <!-- اختيار المكان -->
-            <div class="col-md-2">
-                <label for="place_id" class="form-label">اختر المكان</label>
-                <select id="place_id" name="place_id" class="form-select" required>
-                    <option value="" disabled selected>اختر المكان</option>
-                    {% for location in locations %}
-                        <optgroup label="{{ location.name }}">
-                            {% for site in location.sites %}
-                                {% for place in site.places %}
-                                    <option value="{{ place.id }}">{{ location.name }} / {{ site.name }} / {{ place.name }}</option>
+            <!-- رسائل التنبيه -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} alert-dismissible fade show mb-4" role="alert">
+                            <i class="fas fa-{% if category == 'success' %}check-circle{% else %}exclamation-triangle{% endif %} me-2"></i>
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <!-- نموذج إضافة معيار -->
+            <div class="card shadow mb-4">
+                <div class="card-header bg-primary text-white py-3">
+                    <h6 class="mb-0 fw-bold">
+                        <i class="fas fa-plus-circle me-2"></i>إضافة معيار جديد
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="criteriaForm">
+                        <div class="row g-3">
+                            <!-- اختيار الشركة -->
+                            <div class="col-md-3">
+                                <label for="company_id" class="form-label fw-bold text-muted">الشركة:</label>
+                                <select id="company_id" name="company_id" class="form-select shadow-sm" required>
+                                    <option value="">اختر الشركة</option>
+                                    {% for company in companies %}
+                                        <option value="{{ company.id }}">{{ company.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <!-- اختيار المنطقة -->
+                            <div class="col-md-3">
+                                <label for="location_id" class="form-label fw-bold text-muted">المنطقة:</label>
+                                <select id="location_id" name="location_id" class="form-select shadow-sm" required disabled>
+                                    <option value="">اختر المنطقة</option>
+                                </select>
+                            </div>
+
+                            <!-- اختيار الموقع -->
+                            <div class="col-md-3">
+                                <label for="site_id" class="form-label fw-bold text-muted">الموقع:</label>
+                                <select id="site_id" name="site_id" class="form-select shadow-sm" required disabled>
+                                    <option value="">اختر الموقع</option>
+                                </select>
+                            </div>
+
+                            <!-- اختيار المكان -->
+                            <div class="col-md-3">
+                                <label for="place_id" class="form-label fw-bold text-muted">المكان:</label>
+                                <select id="place_id" name="place_id" class="form-select shadow-sm" required disabled>
+                                    <option value="">اختر المكان</option>
+                                </select>
+                            </div>
+
+                            <!-- اسم المعيار -->
+                            <div class="col-md-4">
+                                <label for="name" class="form-label fw-bold text-muted">اسم المعيار:</label>
+                                <input type="text" name="name" id="name" class="form-control shadow-sm" required
+                                       placeholder="أدخل اسم المعيار">
+                            </div>
+
+                            <!-- الحد الأدنى والأعلى -->
+                            <div class="col-md-2">
+                                <label for="min_score" class="form-label fw-bold text-muted">الحد الأدنى:</label>
+                                <input type="number" name="min_score" id="min_score" class="form-control shadow-sm"
+                                       step="0.01" min="0" required placeholder="0">
+                            </div>
+
+                            <div class="col-md-2">
+                                <label for="max_score" class="form-label fw-bold text-muted">الحد الأعلى:</label>
+                                <input type="number" name="max_score" id="max_score" class="form-control shadow-sm"
+                                       step="0.01" min="0" required placeholder="10">
+                            </div>
+
+                            <!-- جهة المسؤولية -->
+                            <div class="col-md-2">
+                                <label for="authority_id" class="form-label fw-bold text-muted">جهة المسؤولية:</label>
+                                <select id="authority_id" name="authority_id" class="form-select shadow-sm" required>
+                                    <option value="">اختر الجهة</option>
+                                    {% for auth in authorities %}
+                                        <option value="{{ auth.id }}">{{ auth.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <!-- نوع الإضافة -->
+                            <div class="col-md-2">
+                                <label for="add_type" class="form-label fw-bold text-muted">نوع الإضافة:</label>
+                                <select id="add_type" name="add_type" class="form-select shadow-sm" required>
+                                    <option value="single">مكان واحد فقط</option>
+                                    <option value="all_similar">جميع الأماكن المشابهة</option>
+                                </select>
+                            </div>
+
+                            <!-- زر الإضافة -->
+                            <div class="col-md-12 mt-3">
+                                <button type="submit" class="btn btn-primary w-100 shadow-sm">
+                                    <i class="fas fa-save me-2"></i>إضافة المعيار
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- عرض المعايير -->
+            <div class="card shadow">
+                <div class="card-header bg-light py-3">
+                    <h6 class="mb-0 fw-bold text-primary">
+                        <i class="fas fa-list me-2"></i>المعايير المضافة
+                    </h6>
+                </div>
+                <div class="card-body">
+                    {% if criteria %}
+                        <div class="row g-4">
+                            {% for location in locations %}
+                                {% for site in location.sites %}
+                                    {% for place in site.places %}
+                                        {% set place_criteria = [] %}
+                                        {% for c in criteria if c.place and c.place.id == place.id %}
+                                            {% set _ = place_criteria.append(c) %}
+                                        {% endfor %}
+
+                                        {% if place_criteria %}
+                                            <div class="col-12">
+                                                <div class="location-section mb-4 p-3 rounded shadow-sm"
+                                                     style="background: linear-gradient(135deg, #f8f9fa, #e9ecef);">
+                                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                                        <h5 class="fw-bold text-dark mb-0">
+                                                            <i class="fas fa-map-marker-alt text-primary me-2"></i>
+                                                            {{ location.name }}
+                                                            <i class="fas fa-arrow-right mx-2 text-muted"></i>
+                                                            <i class="fas fa-location-arrow text-success me-2"></i>
+                                                            {{ site.name }}
+                                                            <i class="fas fa-arrow-right mx-2 text-muted"></i>
+                                                            <i class="fas fa-building text-warning me-2"></i>
+                                                            {{ place.name }}
+                                                        </h5>
+                                                        <span class="badge bg-primary fs-6">
+                                                            {{ place_criteria|length }} معيار
+                                                        </span>
+                                                    </div>
+
+                                                    <div class="row g-3">
+                                                        {% for c in place_criteria %}
+                                                            <div class="col-xl-4 col-lg-6 col-md-6">
+                                                                <div class="card criterion-card h-100 border-0 shadow-sm">
+                                                                    <div class="card-header py-3 d-flex justify-content-between align-items-center"
+                                                                         style="background: linear-gradient(135deg, #e3f2fd, #bbdefb);">
+                                                                        <h6 class="mb-0 fw-bold text-dark">
+                                                                            <i class="fas fa-list-check me-2"></i>
+                                                                            {{ c.name }}
+                                                                        </h6>
+                                                                        <div class="dropdown">
+                                                                            <button class="btn btn-sm btn-outline-primary dropdown-toggle"
+                                                                                    type="button" data-bs-toggle="dropdown">
+                                                                                <i class="fas fa-ellipsis-v"></i>
+                                                                            </button>
+                                                                            <ul class="dropdown-menu dropdown-menu-end">
+                                                                                <li>
+                                                                                    <a class="dropdown-item text-warning"
+                                                                                       href="{{ url_for('edit_criterion', criterion_id=c.id) }}">
+                                                                                        <i class="fas fa-edit me-2"></i>تعديل
+                                                                                    </a>
+                                                                                </li>
+                                                                                <li><hr class="dropdown-divider"></li>
+                                                                                <li>
+                                                                                    <form action="{{ url_for('delete_criterion', criterion_id=c.id) }}"
+                                                                                          method="post" class="d-inline">
+                                                                                        <button type="submit" class="dropdown-item text-danger"
+                                                                                                onclick="return confirm('هل أنت متأكد من حذف المعيار {{ c.name }}؟')">
+                                                                                            <i class="fas fa-trash me-2"></i>حذف
+                                                                                        </button>
+                                                                                    </form>
+                                                                                </li>
+                                                                            </ul>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="card-body">
+                                                                        <div class="criterion-details">
+                                                                            <div class="row g-2">
+                                                                                <div class="col-6">
+                                                                                    <small class="text-muted">الحد الأدنى:</small>
+                                                                                    <div class="fw-bold text-success">{{ c.min_score }}</div>
+                                                                                </div>
+                                                                                <div class="col-6">
+                                                                                    <small class="text-muted">الحد الأعلى:</small>
+                                                                                    <div class="fw-bold text-danger">{{ c.max_score }}</div>
+                                                                                </div>
+                                                                                <div class="col-12 mt-2">
+                                                                                    <small class="text-muted">جهة المسؤولية:</small>
+                                                                                    <div class="fw-bold text-warning">
+                                                                                        <i class="fas fa-building me-1"></i>
+                                                                                        {{ c.authority.name if c.authority else 'غير محدد' }}
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        {% endfor %}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                    {% endfor %}
                                 {% endfor %}
                             {% endfor %}
-                        </optgroup>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <!-- اسم المعيار -->
-            <div class="col-md-2">
-                <label for="name" class="form-label">اسم المعيار</label>
-                <input type="text" name="name" id="name" class="form-control" required placeholder="اسم المعيار">
-            </div>
-
-            <!-- الحد الأدنى -->
-            <div class="col-md-2">
-                <label for="min_score" class="form-label">الحد الأدنى</label>
-                <input type="number" name="min_score" id="min_score" class="form-control" step="0.01" required placeholder="مثلاً 0">
-            </div>
-
-            <!-- الحد الأعلى -->
-            <div class="col-md-2">
-                <label for="max_score" class="form-label">الحد الأعلى</label>
-                <input type="number" name="max_score" id="max_score" class="form-control" step="0.01" required placeholder="مثلاً 10">
-            </div>
-
-            <!-- جهة المسؤولية -->
-            <div class="col-md-2">
-                <label for="authority_id" class="form-label">جهة المسؤولية</label>
-                <select id="authority_id" name="authority_id" class="form-select" required>
-                    <option value="" disabled selected>اختر الجهة</option>
-                    {% for auth in authorities %}
-                        <option value="{{ auth.id }}">{{ auth.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <!-- نوع الإضافة -->
-            <div class="col-md-2">
-                <label for="add_type" class="form-label">نوع الإضافة</label>
-                <select id="add_type" name="add_type" class="form-select" required>
-                    <option value="single" selected>مكان واحد فقط</option>
-                    <option value="all_similar">جميع الأماكن المشابهة</option>
-                </select>
-            </div>
-
-            <!-- زر الإضافة -->
-            <div class="col-md-2">
-                <button type="submit" class="btn btn-primary w-100 shadow-sm">إضافة المعيار</button>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <div class="empty-state">
+                                <i class="fas fa-list-alt fa-4x text-muted mb-3"></i>
+                                <h5 class="text-muted">لا توجد معايير مضافة بعد</h5>
+                                <p class="text-muted mb-4">استخدم نموذج الإضافة أعلاه لبدء إضافة المعايير</p>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
             </div>
         </div>
-    </form>
-
-    <!-- عرض المعايير -->
-    {% for location in locations %}
-        {% for site in location.sites %}
-            <div class="p-3 mb-3 rounded shadow-sm" style="background-color:#d9f2e6;">
-                <h4 class="mb-2 text-primary fw-bold">
-                    <i class="bi bi-geo-alt-fill"></i> الموقع: {{ site.name }}
-                    <span class="text-muted">(المنطقة: {{ location.name }})</span>
-                </h4>
-
-                {% for place in site.places %}
-                    <div class="p-3 mb-3 rounded shadow-sm" style="background-color:#e6f9ef;">
-                        <h5 class="mb-3 text-secondary fw-bold">
-                            <i class="bi bi-building"></i> المكان: {{ place.name }}
-                        </h5>
-
-                        {% set place_criteria = [] %}
-                        {% for c in criteria if c.place and c.place.id == place.id %}
-                            {% set _ = place_criteria.append(c) %}
-                        {% endfor %}
-
-                        {% if place_criteria %}
-                            <div class="row">
-                                {% for c in place_criteria %}
-                                    <div class="col-md-4 mb-4">
-                                        <div class="card border-0 shadow-lg h-100 rounded-3"
-                                             style="background: linear-gradient(135deg, #f0f9ff, #e0f7fa); font-family: 'Tahoma', sans-serif;">
-                                            <div class="card-body">
-                                                <h5 class="card-title text-dark fw-bold mb-3" style="font-size: 1.1rem;">
-                                                    <i class="bi bi-check-circle-fill text-primary"></i> {{ c.name }}
-                                                </h5>
-                                                <p class="card-text" style="font-size: 0.95rem; line-height: 1.6;">
-                                                    <span class="badge bg-success">الحد الأدنى: {{ c.min_score }}</span>
-                                                    <span class="badge bg-danger">الحد الأعلى: {{ c.max_score }}</span><br>
-                                                    <span class="badge bg-warning text-dark mt-2">الجهة: {{ c.authority.name if c.authority else '-' }}</span>
-                                                </p>
-                                            </div>
-                                            <div class="card-footer bg-transparent text-center">
-                                                <a href="{{ url_for('edit_criterion', criterion_id=c.id) }}" class="btn btn-sm btn-warning shadow-sm">✏ تعديل</a>
-                                                <form action="{{ url_for('delete_criterion', criterion_id=c.id) }}" method="post" style="display:inline;" onsubmit="return confirm('هل أنت متأكد من حذف هذا المعيار؟');">
-                                                    <button type="submit" class="btn btn-sm btn-danger shadow-sm">🗑 حذف</button>
-                                                </form>
-                                            </div>
-                                        </div>
-                                    </div>
-                                {% endfor %}
-                            </div>
-                        {% else %}
-                            <p class="text-danger">⚠ لا توجد معايير مضافة لهذا المكان.</p>
-                        {% endif %}
-                    </div>
-                {% endfor %}
-            </div>
-        {% endfor %}
-    {% endfor %}
+    </div>
 </div>
+{% endblock %}
+
+{% block styles %}
+<style>
+.criterion-card {
+    transition: all 0.3s ease;
+    border-radius: 10px;
+}
+
+.criterion-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
+}
+
+.location-section {
+    border-left: 4px solid #007bff;
+}
+
+.empty-state {
+    padding: 40px 20px;
+}
+
+.empty-state i {
+    opacity: 0.5;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #2196F3;
+    box-shadow: 0 0 0 0.2rem rgba(33, 150, 243, 0.1);
+}
+
+.card-header {
+    border-radius: 10px 10px 0 0 !important;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const companySelect = document.getElementById('company_id');
+    const locationSelect = document.getElementById('location_id');
+    const siteSelect = document.getElementById('site_id');
+    const placeSelect = document.getElementById('place_id');
+
+    // تفعيل/تعطيل الحقول بناءً على الاختيار
+    function updateFormState() {
+        locationSelect.disabled = !companySelect.value;
+        siteSelect.disabled = !locationSelect.value;
+        placeSelect.disabled = !siteSelect.value;
+
+        if (!companySelect.value) {
+            locationSelect.innerHTML = '<option value="">اختر المنطقة</option>';
+            siteSelect.innerHTML = '<option value="">اختر الموقع</option>';
+            placeSelect.innerHTML = '<option value="">اختر المكان</option>';
+        }
+    }
+
+    // جلب المناطق عند اختيار الشركة
+    companySelect.addEventListener('change', function() {
+        const companyId = this.value;
+
+        if (!companyId) {
+            updateFormState();
+            return;
+        }
+
+        fetch(`/get_locations/${companyId}`)
+            .then(response => response.json())
+            .then(data => {
+                locationSelect.innerHTML = '<option value="">اختر المنطقة</option>';
+                data.forEach(location => {
+                    locationSelect.innerHTML += `<option value="${location.id}">${location.name}</option>`;
+                });
+                locationSelect.disabled = false;
+
+                // إعادة تعيين الحقول التالية
+                siteSelect.innerHTML = '<option value="">اختر الموقع</option>';
+                siteSelect.disabled = true;
+                placeSelect.innerHTML = '<option value="">اختر المكان</option>';
+                placeSelect.disabled = true;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('حدث خطأ في جلب البيانات');
+            });
+    });
+
+    // جلب المواقع عند اختيار المنطقة
+    locationSelect.addEventListener('change', function() {
+        const locationId = this.value;
+
+        if (!locationId) {
+            siteSelect.innerHTML = '<option value="">اختر الموقع</option>';
+            siteSelect.disabled = true;
+            placeSelect.innerHTML = '<option value="">اختر المكان</option>';
+            placeSelect.disabled = true;
+            return;
+        }
+
+        fetch(`/get_sites/${locationId}`)
+            .then(response => response.json())
+            .then(data => {
+                siteSelect.innerHTML = '<option value="">اختر الموقع</option>';
+                data.forEach(site => {
+                    siteSelect.innerHTML += `<option value="${site.id}">${site.name}</option>`;
+                });
+                siteSelect.disabled = false;
+
+                // إعادة تعيين الحقول التالية
+                placeSelect.innerHTML = '<option value="">اختر المكان</option>';
+                placeSelect.disabled = true;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('حدث خطأ في جلب البيانات');
+            });
+    });
+
+    // جلب الأماكن عند اختيار الموقع
+    siteSelect.addEventListener('change', function() {
+        const siteId = this.value;
+
+        if (!siteId) {
+            placeSelect.innerHTML = '<option value="">اختر المكان</option>';
+            placeSelect.disabled = true;
+            return;
+        }
+
+        fetch(`/get_places/${siteId}`)
+            .then(response => response.json())
+            .then(data => {
+                placeSelect.innerHTML = '<option value="">اختر المكان</option>';
+                data.forEach(place => {
+                    placeSelect.innerHTML += `<option value="${place.id}">${place.name}</option>`;
+                });
+                placeSelect.disabled = false;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('حدث خطأ في جلب البيانات');
+            });
+    });
+
+    // التحقق من صحة النموذج قبل الإرسال
+    document.getElementById('criteriaForm').addEventListener('submit', function(e) {
+        const minScore = parseFloat(document.getElementById('min_score').value);
+        const maxScore = parseFloat(document.getElementById('max_score').value);
+
+        if (minScore >= maxScore) {
+            e.preventDefault();
+            alert('الحد الأعلى يجب أن يكون أكبر من الحد الأدنى');
+            return false;
+        }
+
+        if (!companySelect.value || !locationSelect.value || !siteSelect.value || !placeSelect.value) {
+            e.preventDefault();
+            alert('يجب اختيار الشركة والمنطقة والموقع والمكان');
+            return false;
+        }
+    });
+
+    // التهيئة الأولية
+    updateFormState();
+});
+</script>
 {% endblock %}

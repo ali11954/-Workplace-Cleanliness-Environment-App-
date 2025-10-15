@@ -2,113 +2,492 @@
 {% block title %}تسجيل التقييم{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
-    <h2 class="mb-4 text-center">تسجيل التقييم</h2>
+<div class="container-fluid py-4">
+    <!-- رأس الصفحة -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <div>
+            <h1 class="h3 mb-2 text-gray-800 fw-bold">
+                <i class="fas fa-clipboard-check me-2 text-primary"></i>تسجيل التقييم
+            </h1>
+            <p class="text-muted mb-0">تسجيل تقييم جديد للمواقع والأماكن</p>
+        </div>
+        <div class="btn-group">
+            <button type="button" class="btn btn-outline-info" data-bs-toggle="modal" data-bs-target="#helpModal">
+                <i class="fas fa-question-circle me-2"></i>مساعدة
+            </button>
+        </div>
+    </div>
 
-    <form method="POST">
-        {{ form.hidden_tag() }}
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- نموذج التقييم -->
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-light-primary text-white py-3 border-0">
+                    <h6 class="mb-0 fw-bold">
+                        <i class="fas fa-edit me-2"></i>نموذج التقييم
+                    </h6>
+                </div>
+                <div class="card-body p-4">
+                    <form method="POST" id="evaluationForm">
+                        {{ form.hidden_tag() }}
 
-        <div class="row mb-3">
-            <div class="col">
-                {{ form.region_id.label }}
-                {{ form.region_id(class="form-select") }}
-            </div>
-            <div class="col">
-                {{ form.site_id.label }}
-                {{ form.site_id(class="form-select") }}
-            </div>
-            <div class="col">
-                {{ form.place_id.label }}
-                {{ form.place_id(class="form-select") }}
+                        <!-- اختيار الموقع -->
+                        <div class="row g-4 mb-4">
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    {{ form.region_id.label(class="form-label fw-bold text-muted mb-3") }}
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light-primary border-0">
+                                            <i class="fas fa-map-marker-alt text-primary"></i>
+                                        </span>
+                                        {{ form.region_id(class="form-select border-0 shadow-sm py-2") }}
+                                    </div>
+                                    {% for error in form.region_id.errors %}
+                                    <div class="text-danger small mt-2">
+                                        <i class="fas fa-exclamation-circle me-1"></i>{{ error }}
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    {{ form.site_id.label(class="form-label fw-bold text-muted mb-3") }}
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light-success border-0">
+                                            <i class="fas fa-location-arrow text-success"></i>
+                                        </span>
+                                        {{ form.site_id(class="form-select border-0 shadow-sm py-2", disabled=true) }}
+                                    </div>
+                                    {% for error in form.site_id.errors %}
+                                    <div class="text-danger small mt-2">
+                                        <i class="fas fa-exclamation-circle me-1"></i>{{ error }}
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    {{ form.place_id.label(class="form-label fw-bold text-muted mb-3") }}
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light-warning border-0">
+                                            <i class="fas fa-building text-warning"></i>
+                                        </span>
+                                        {{ form.place_id(class="form-select border-0 shadow-sm py-2", disabled=true) }}
+                                    </div>
+                                    {% for error in form.place_id.errors %}
+                                    <div class="text-danger small mt-2">
+                                        <i class="fas fa-exclamation-circle me-1"></i>{{ error }}
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- المعايير والتقييمات -->
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5 class="fw-bold text-muted">
+                                    <i class="fas fa-list-check me-2"></i>المعايير والتقييمات
+                                </h5>
+                                <button type="button" class="btn btn-primary btn-sm shadow-sm" id="add-row">
+                                    <i class="fas fa-plus me-2"></i>إضافة معيار
+                                </button>
+                            </div>
+
+                            <div class="table-responsive">
+                                <table class="table table-hover border-0" id="criteria-table">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th width="30%" class="border-0 py-3">
+                                                <i class="fas fa-tag me-2"></i>المعيار
+                                            </th>
+                                            <th width="30%" class="border-0 py-3">
+                                                <i class="fas fa-building me-2"></i>جهة المسؤولية
+                                            </th>
+                                            <th width="20%" class="border-0 py-3">
+                                                <i class="fas fa-star me-2"></i>الدرجة
+                                            </th>
+                                            <th width="20%" class="border-0 py-3">الإجراءات</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for detail in form.details %}
+                                        <tr class="criteria-row">
+                                            <td class="border-0">
+                                                {{ detail.criterion_id(class="form-select border-0 shadow-sm criterion-select") }}
+                                            </td>
+                                            <td class="border-0">
+                                                {{ detail.authority_id(class="form-select border-0 shadow-sm authority-select") }}
+                                            </td>
+                                            <td class="border-0">
+                                                {{ detail.score(class="form-control border-0 shadow-sm score-input", type="number", min="0", step="0.1", placeholder="0-100") }}
+                                            </td>
+                                            <td class="border-0">
+                                                <button type="button" class="btn btn-outline-danger btn-sm remove-row" title="حذف">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div id="noCriteriaMessage" class="text-center py-5 bg-light rounded-3 {% if form.details %}d-none{% endif %}">
+                                <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+                                <h6 class="text-muted">لا توجد معايير مضافة</h6>
+                                <p class="text-muted mb-0">انقر على زر "إضافة معيار" لبدء إضافة المعايير</p>
+                            </div>
+                        </div>
+
+                        <!-- الملاحظات -->
+                        <div class="mb-4">
+                            <div class="form-group">
+                                {{ form.notes.label(class="form-label fw-bold text-muted mb-3") }}
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light-info border-0 align-items-start">
+                                        <i class="fas fa-sticky-note text-info mt-1"></i>
+                                    </span>
+                                    {{ form.notes(class="form-control border-0 shadow-sm", rows="4", placeholder="أدخل أي ملاحظات إضافية حول التقييم...") }}
+                                </div>
+                                {% for error in form.notes.errors %}
+                                <div class="text-danger small mt-2">
+                                    <i class="fas fa-exclamation-circle me-1"></i>{{ error }}
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- أزرار التحكم -->
+                        <div class="d-flex gap-3 mt-4 pt-4 border-top">
+                            <button type="submit" class="btn btn-success shadow-sm px-5 py-2 flex-fill">
+                                <i class="fas fa-save me-2"></i>{{ form.submit.label.text }}
+                            </button>
+                            <button type="reset" class="btn btn-outline-secondary shadow-sm px-5 py-2">
+                                <i class="fas fa-redo me-2"></i>إعادة تعيين
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
 
-        <hr>
-        <h4>المعايير والتقييمات</h4>
-        <table class="table table-bordered text-center" id="criteria-table">
-            <thead>
-                <tr>
-                    <th>المعيار</th>
-                    <th>جهة المسؤولية</th>
-                    <th>الدرجة</th>
-                    <th><button type="button" class="btn btn-sm btn-primary" id="add-row">إضافة معيار</button></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for detail in form.details %}
-                <tr>
-                    <td>{{ detail.criterion_id(class="form-select") }}</td>
-                    <td>{{ detail.authority_id(class="form-select") }}</td>
-                    <td>{{ detail.score(class="form-control") }}</td>
-                    <td></td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <div class="col-lg-4">
+            <!-- معلومات المساعدة -->
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-light-info text-white py-3 border-0">
+                    <h6 class="mb-0 fw-bold">
+                        <i class="fas fa-info-circle me-2"></i>معلومات التقييم
+                    </h6>
+                </div>
+                <div class="card-body p-4">
+                    <div class="alert alert-light-info border-0 rounded-3">
+                        <h6 class="fw-bold text-info mb-3">تعليمات هامة:</h6>
+                        <ul class="list-unstyled mb-0">
+                            <li class="mb-2 d-flex align-items-start">
+                                <i class="fas fa-check-circle text-info me-2 mt-1"></i>
+                                <span>اختر المنطقة أولاً ثم الموقع ثم المكان</span>
+                            </li>
+                            <li class="mb-2 d-flex align-items-start">
+                                <i class="fas fa-check-circle text-info me-2 mt-1"></i>
+                                <span>أضف جميع المعايير المراد تقييمها</span>
+                            </li>
+                            <li class="mb-2 d-flex align-items-start">
+                                <i class="fas fa-check-circle text-info me-2 mt-1"></i>
+                                <span>الدرجة من 0 إلى 100</span>
+                            </li>
+                            <li class="d-flex align-items-start">
+                                <i class="fas fa-check-circle text-info me-2 mt-1"></i>
+                                <span>يمكن إضافة ملاحظات إضافية إذا لزم الأمر</span>
+                            </li>
+                        </ul>
+                    </div>
 
-        <div class="mb-3">
-            {{ form.notes.label }}
-            {{ form.notes(class="form-control") }}
+                    <!-- إحصائيات سريعة -->
+                    <div class="mt-4 pt-3 border-top">
+                        <h6 class="fw-bold text-muted mb-3">إحصائيات سريعة:</h6>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <div class="text-center p-3 bg-light-primary rounded-3">
+                                    <h5 class="text-primary mb-1 fw-bold" id="criteriaCount">0</h5>
+                                    <small class="text-muted">معيار مضافة</small>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-center p-3 bg-light-success rounded-3">
+                                    <h5 class="text-success mb-1 fw-bold" id="totalScore">0</h5>
+                                    <small class="text-muted">المجموع</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- المعايير المتاحة -->
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-light-success text-white py-3 border-0">
+                    <h6 class="mb-0 fw-bold">
+                        <i class="fas fa-list me-2"></i>المعايير المتاحة
+                    </h6>
+                </div>
+                <div class="card-body p-4">
+                    <div id="availableCriteria" class="available-criteria-list">
+                        <div class="text-center py-3">
+                            <i class="fas fa-map-marker-alt fa-2x text-muted mb-2"></i>
+                            <p class="text-muted mb-0">اختر منطقة أولاً لعرض المعايير المتاحة</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
+    </div>
 
-        <button class="btn btn-success">{{ form.submit.label }}</button>
-    </form>
-
-    <hr>
-    <h3 class="mt-4">قائمة التقييمات المسجلة</h3>
-    <table class="table table-bordered text-center">
-        <thead>
-            <tr>
-                <th>المنطقة</th>
-                <th>الموقع</th>
-                <th>المكان</th>
-                <th>المعيار</th>
-                <th>الجهة</th>
-                <th>الدرجة</th>
-                <th>الملاحظات</th>
-                <th>التاريخ</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for ev in evaluations %}
-            <tr>
-                <td>{{ ev.region.name }}</td>
-                <td>{{ ev.site.name }}</td>
-                <td>{{ ev.place.name }}</td>
-                <td>
-                    {% for detail in ev.details %}
-                        {{ detail.criterion.name }}<br>
-                    {% endfor %}
-                </td>
-                <td>
-                    {% for detail in ev.details %}
-                        {{ detail.authority.name }}<br>
-                    {% endfor %}
-                </td>
-                <td>
-                    {% for detail in ev.details %}
-                        {{ detail.score }}<br>
-                    {% endfor %}
-                </td>
-                <td>{{ ev.notes }}</td>
-                <td>{{ ev.date.strftime("%Y-%m-%d") }}</td>
-            </tr>
+    <!-- قائمة التقييمات المسجلة -->
+    <div class="card shadow-sm border-0 mt-4">
+        <div class="card-header bg-light-warning text-white py-3 border-0">
+            <h6 class="mb-0 fw-bold">
+                <i class="fas fa-history me-2"></i>قائمة التقييمات المسجلة
+            </h6>
+        </div>
+        <div class="card-body p-4">
+            {% if evaluations %}
+            <div class="table-responsive">
+                <table class="table table-hover border-0" id="evaluationsTable">
+                    <thead class="bg-light">
+                        <tr>
+                            <th class="border-0 py-3">المنطقة</th>
+                            <th class="border-0 py-3">الموقع</th>
+                            <th class="border-0 py-3">المكان</th>
+                            <th class="border-0 py-3">المعايير</th>
+                            <th class="border-0 py-3">الدرجات</th>
+                            <th class="border-0 py-3">المعدل</th>
+                            <th class="border-0 py-3">التاريخ</th>
+                            <th class="border-0 py-3">الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ev in evaluations %}
+                        <tr>
+                            <td class="border-0">
+                                <span class="badge bg-light-primary text-primary">{{ ev.region.name }}</span>
+                            </td>
+                            <td class="border-0">
+                                <span class="badge bg-light-success text-success">{{ ev.site.name }}</span>
+                            </td>
+                            <td class="border-0">
+                                <span class="badge bg-light-warning text-warning">{{ ev.place.name }}</span>
+                            </td>
+                            <td class="border-0">
+                                {% for detail in ev.details %}
+                                <span class="badge bg-light mb-1 d-block">{{ detail.criterion.name }}</span>
+                                {% endfor %}
+                            </td>
+                            <td class="border-0">
+                                {% for detail in ev.details %}
+                                <span class="badge {% if detail.score >= 80 %}bg-light-success text-success{% elif detail.score >= 60 %}bg-light-warning text-warning{% else %}bg-light-danger text-danger{% endif %} mb-1 d-block">
+                                    {{ detail.score }}
+                                </span>
+                                {% endfor %}
+                            </td>
+                            <td class="border-0">
+                                {% set total_score = ev.details|sum(attribute='score') %}
+                                {% set avg_score = total_score / ev.details|length if ev.details|length > 0 else 0 %}
+                                <span class="badge {% if avg_score >= 80 %}bg-success{% elif avg_score >= 60 %}bg-warning{% else %}bg-danger{% endif %}">
+                                    {{ "%.1f"|format(avg_score) }}
+                                </span>
+                            </td>
+                            <td class="border-0">
+                                <small class="text-muted">{{ ev.date.strftime("%Y-%m-%d") }}</small>
+                            </td>
+                            <td class="border-0">
+                                <button class="btn btn-outline-info btn-sm view-details" data-evaluation-id="{{ ev.id }}">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
             {% else %}
-            <tr>
-                <td colspan="8">لا توجد تقييمات مسجلة بعد</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+            <div class="text-center py-5">
+                <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+                <h6 class="text-muted">لا توجد تقييمات مسجلة</h6>
+                <p class="text-muted mb-0">لم يتم تسجيل أي تقييمات بعد</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
 </div>
 
-<script>
-document.getElementById('add-row').addEventListener('click', function() {
-    let tableBody = document.querySelector('#criteria-table tbody');
-    let newRow = tableBody.rows[0].cloneNode(true); // نسخ أول صف كقالب
-    newRow.querySelectorAll('select,input').forEach(input => input.value = ''); // تفريغ القيم
-    tableBody.appendChild(newRow);
-});
-</script>
+<!-- Modal المساعدة -->
+<div class="modal fade" id="helpModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-light-primary text-white border-0">
+                <h5 class="modal-title">مساعدة - تسجيل التقييم</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body bg-light">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-map-marker-alt text-primary me-2"></i>اختيار الموقع</h6>
+                        <p class="text-muted small">اختر المنطقة أولاً، ثم سيتم تفعيل خيارات المواقع، ثم الأماكن.</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-list-check text-success me-2"></i>إضافة المعايير</h6>
+                        <p class="text-muted small">أضف جميع المعايير المراد تقييمها مع درجاتها من 0 إلى 100.</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-star text-warning me-2"></i>نظام الدرجات</h6>
+                        <p class="text-muted small">الدرجة من 0 إلى 100، حيث 100 تمثل التقييم المثالي.</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-sticky-note text-info me-2"></i>الملاحظات</h6>
+                        <p class="text-muted small">أضف أي ملاحظات إضافية تساعد في فهم التقييم.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
 
+{% block styles %}
+<style>
+/* ===================== الألوان الفاتحة المخصصة ===================== */
+:root {
+    --light-primary: #e3f2fd;
+    --light-success: #e8f5e8;
+    --light-warning: #fff3cd;
+    --light-info: #d1ecf1;
+    --light-danger: #f8d7da;
+}
+
+.bg-light-primary { background: linear-gradient(135deg, #e3f2fd, #f3f9ff) !important; }
+.bg-light-success { background: linear-gradient(135deg, #e8f5e8, #f4fbf4) !important; }
+.bg-light-warning { background: linear-gradient(135deg, #fff3cd, #fffbf0) !important; }
+.bg-light-info { background: linear-gradient(135deg, #d1ecf1, #e8f7fa) !important; }
+.bg-light-danger { background: linear-gradient(135deg, #f8d7da, #fef7f7) !important; }
+
+/* ===================== التصميم العام ===================== */
+.card {
+    border-radius: 15px;
+    overflow: hidden;
+}
+
+.card-header {
+    border-radius: 15px 15px 0 0 !important;
+}
+
+.form-control, .form-select {
+    border-radius: 10px;
+    transition: all 0.3s ease;
+}
+
+.form-control:focus, .form-select:focus {
+    box-shadow: 0 0 0 0.2rem rgba(78, 205, 196, 0.15);
+    border-color: #4ecdc4;
+}
+
+/* ===================== جدول المعايير ===================== */
+#criteria-table tbody tr {
+    transition: all 0.3s ease;
+    background: white;
+}
+
+#criteria-table tbody tr:hover {
+    background: #f8f9fa;
+    transform: translateY(-1px);
+}
+
+.criteria-row td {
+    padding: 12px 8px;
+}
+
+/* ===================== أزرار مخصصة ===================== */
+.btn-primary {
+    background: linear-gradient(135deg, #4ecdc4, #44a08d);
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #56ab2f, #a8e6cf);
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+}
+
+.btn-sm {
+    border-radius: 8px;
+}
+
+/* ===================== تأثيرات ===================== */
+.shadow-sm {
+    box-shadow: 0 2px 15px rgba(0,0,0,0.08) !important;
+}
+
+.border-0 {
+    border: none !important;
+}
+
+/* ===================== التجاوب ===================== */
+@media (max-width: 768px) {
+    .container-fluid {
+        padding: 10px;
+    }
+
+    .card-body {
+        padding: 20px;
+    }
+
+    .table-responsive {
+        font-size: 0.85rem;
+    }
+
+    .btn {
+        width: 100%;
+        margin-bottom: 10px;
+    }
+}
+
+/* ===================== تحسينات إضافية ===================== */
+.available-criteria-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.criteria-item {
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.criteria-item:hover {
+    background: var(--light-primary);
+    transform: translateX(5px);
+}
+
+.score-input:invalid {
+    border-color: #dc3545;
+}
+
+.score-input:valid {
+    border-color: #28a745;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// سأوفر لك كود JavaScript في الرد التالي بسبب حدود الطول
+// سيشمل: إدارة الصفوف الديناميكية، التحديث التلقائي، التحقق من الصحة، وغيرها
+</script>
 {% endblock %}

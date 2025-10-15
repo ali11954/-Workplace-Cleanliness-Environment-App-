@@ -78,6 +78,14 @@ class User(db.Model, UserMixin):
     company = db.relationship('Company', back_populates='users')
     regions = db.relationship('Location', secondary=user_regions, backref='users')
 
+    # ✅ ✅ ✅ أضف العلاقات المقابلة
+    owned_evaluations = db.relationship(
+        'Evaluation',
+        foreign_keys='Evaluation.user_id',
+        back_populates='user',
+        lazy=True
+    )
+
     # إضافة العلاقة مع الصلاحيات المخصصة
     user_permissions = db.relationship('UserPermission', back_populates='user', lazy=True, cascade='all, delete-orphan')
 
@@ -337,9 +345,45 @@ class User(db.Model, UserMixin):
         else:
             return 'user_dashboard'
 
+
+    def get_accessible_locations(self):
+        """الحصول على المناطق التي يمكن للمستخدم الوصول إليها"""
+        if self.is_admin or self.role == 'admin':
+            return Location.query.filter_by(is_active=True).all()
+        elif self.regions:
+            return self.regions
+        elif self.company_id:
+            return Location.query.filter_by(company_id=self.company_id, is_active=True).all()
+        return []
+
+    def can_access_location(self, location_id):
+        """التحقق من إمكانية الوصول لمنطقة معينة"""
+        if self.is_admin or self.role == 'admin':
+            return True
+
+        accessible_locations = self.get_accessible_locations()
+        return any(loc.id == location_id for loc in accessible_locations)
+
+
+    def get_regions_safe(self):
+        """الحصول على المناطق بشكل آمن يتجنب DetachedInstanceError"""
+        try:
+                # إذا كان الكائن مرتبطاً بالجلسة
+            if self in db.session:
+                return self.regions
+            else:
+                    # استعلام منفصل إذا كان الكائن منفصلاً
+                return db.session.query(Location).join(
+                    user_regions, Location.id == user_regions.c.region_id
+                ).filter(user_regions.c.user_id == self.id).all()
+        except Exception as e:
+            print(f"❌ خطأ في get_regions_safe: {e}")
+            return []
+
     def __repr__(self):
         return f'<User {self.username} - {self.role}>'
 
+# تحسين العلاقات في نموذج Location
 class Location(db.Model):
     __tablename__ = 'location'
     id = db.Column(db.Integer, primary_key=True)
@@ -347,10 +391,15 @@ class Location(db.Model):
     parent_id = db.Column(db.Integer, db.ForeignKey('location.id'), nullable=True)
     company_id = db.Column(db.Integer, db.ForeignKey('companies.id'), nullable=False)
 
+    # تحسين العلاقات
     company = db.relationship('Company', back_populates='locations')
-    sites = db.relationship('Site', backref='location', cascade='all, delete-orphan')
-    children = db.relationship('Location')
+    parent = db.relationship('Location', remote_side=[id], backref='sub_locations')
+    sites = db.relationship('Site', back_populates='location', cascade='all, delete-orphan')
 
+    # إضافة حقول مفيدة
+    code = db.Column(db.String(50), unique=True)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Site(db.Model):
     __tablename__ = 'site'
@@ -358,6 +407,7 @@ class Site(db.Model):
     name = db.Column(db.String(100), nullable=False)
 
     region_id = db.Column(db.Integer, db.ForeignKey('location.id'), nullable=False)
+    location = db.relationship('Location', back_populates='sites')
 
     # علاقة مع الأماكن (Places)
     places = db.relationship('Place', backref='site', cascade='all, delete-orphan')
@@ -402,16 +452,45 @@ class Evaluation(db.Model):
     notes = db.Column(db.Text)
     date = db.Column(db.DateTime, default=datetime.utcnow)
 
+    # إضافة حالة التقييم
+    status = db.Column(Enum('draft', 'submitted', 'approved', 'rejected',
+                            name='evaluation_status'), default='draft')
 
-    # العلاقات
+    # إضافة حقول للتحقق
+    submitted_at = db.Column(db.DateTime)
+    approved_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    approved_at = db.Column(db.DateTime)
+
+    # ✅ تأكد من إضافة هذه الحقول إذا كانت موجودة في DB
+    created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    updated_by_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+
+    # ✅ ✅ ✅ العلاقات مع backref فريدة
+    approved_user = db.relationship('User', foreign_keys=[approved_by], backref='approved_evaluations')
+
+    user = db.relationship('User', foreign_keys=[user_id], back_populates='owned_evaluations')
+
+
+    created_by = db.relationship('User', foreign_keys=[created_by_id], backref='created_evaluations')
+    updated_by = db.relationship('User', foreign_keys=[updated_by_id], backref='updated_evaluations')
+
     region = db.relationship('Location', foreign_keys=[region_id], backref='evaluations')
-    site = db.relationship('Site', backref=db.backref('evaluations', lazy=True))
-    place = db.relationship('Place', backref=db.backref('evaluations', lazy=True))
-    user = db.relationship('User', backref=db.backref('evaluations', lazy=True))
-    criterion = db.relationship('Criterion', backref=db.backref('evaluations', lazy=True))
+    site = db.relationship('Site', foreign_keys=[site_id], backref='evaluations')
+    place = db.relationship('Place', foreign_keys=[place_id], backref='evaluations')
+    criterion = db.relationship('Criterion', foreign_keys=[criterion_id], backref='evaluations')
     details = db.relationship('EvaluationDetail', backref='evaluation', cascade='all, delete-orphan')
 
+    __table_args__ = (
+        db.Index('idx_evaluation_user_date', 'user_id', 'date'),
+        db.Index('idx_evaluation_region_date', 'region_id', 'date'),
+        db.Index('idx_evaluation_status', 'status'),
+    )
 
+    @property
+    def is_editable(self):
+        return self.status in ['draft', 'rejected']
+
+    # ... باقي الكود
 class EvaluationDetail(db.Model):
     __tablename__ = "evaluation_detail"   # ← لازم يتطابق مع foreign key
     id = db.Column(db.Integer, primary_key=True)
@@ -434,12 +513,26 @@ class EvaluationDetail(db.Model):
     user = db.relationship('User')
     authority = db.relationship('EvaluationAuthority', backref='evaluation_details')
 
+    __table_args__ = (
+        db.Index('idx_eval_detail_evaluation', 'evaluation_id'),
+        db.Index('idx_eval_detail_criterion', 'criterion_id'),
+        db.Index('idx_eval_detail_authority', 'authority_id'),
+    )
 class EvaluationAuthority(db.Model):
     __tablename__ = 'evaluation_authorities'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False, unique=True)
     company_id = db.Column(db.Integer, db.ForeignKey('companies.id'), nullable=False)  # 🔑 مفتاح أجنبي
     company = db.relationship('Company', back_populates='evaluation_authorities')
+
+    @classmethod
+    def get_authorities_by_company(cls, company_id):
+        """الحصول على جهات التقييم لشركة معينة"""
+        return cls.query.filter_by(company_id=company_id).all()
+
+    def get_related_criteria(self):
+        """الحصول على المعايير المرتبطة بجهة التقييم"""
+        return Criterion.query.filter_by(authority_id=self.id).all()
 
     def __repr__(self):
         return f"<EvaluationAuthority {self.name}>"
@@ -450,9 +543,9 @@ from datetime import datetime
 
 
 class ActionPlan(db.Model):
-    __tablename__ = "action_plans"
+    __tablename__ = "action_plan"
     id = db.Column(db.Integer, primary_key=True)
-    note = db.Column(db.Text)
+    note = db.Column(db.Text, nullable=False)  # ✅ غير إلى nullable=False
     plan_text = db.Column(db.Text)
     action_plan = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -472,4 +565,158 @@ class ActionPlan(db.Model):
     site = db.relationship("Site", backref="action_plans")
     place = db.relationship("Place", backref="action_plans")
     criterion = db.relationship("Criterion", backref="action_plans")
-    closing_note = db.Column(db.Text, nullable=True)
+
+    def __init__(self, **kwargs):
+        # ✅ هذا يحل المشكلة - تعيين قيم افتراضية للحقول الإلزامية
+        kwargs.setdefault('note', 'لا توجد ملاحظات')
+        kwargs.setdefault('plan_text', '')
+        kwargs.setdefault('action_plan', '')
+        super().__init__(**kwargs)
+
+class AuditLog(db.Model):
+    __tablename__ = 'audit_logs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    action = db.Column(db.String(100), nullable=False)
+    table_name = db.Column(db.String(100), nullable=False)
+    record_id = db.Column(db.Integer, nullable=False)
+    old_values = db.Column(db.Text)
+    new_values = db.Column(db.Text)
+    ip_address = db.Column(db.String(45))
+    user_agent = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', backref='audit_logs')
+
+
+class Notification(db.Model):
+    __tablename__ = 'notifications'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    is_read = db.Column(db.Boolean, default=False)
+    notification_type = db.Column(db.String(50))  # info, warning, success, danger
+    related_url = db.Column(db.String(500))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', backref='notifications')
+
+
+
+
+from flask import request
+import json
+from datetime import datetime
+
+
+class AuditLogService:
+
+    @staticmethod
+    def create_audit_log(user_id, action, table_name, record_id, old_values=None, new_values=None):
+        """إنشاء سجل تدقيق جديد"""
+        audit_log = AuditLog(
+            user_id=user_id,
+            action=action,
+            table_name=table_name,
+            record_id=record_id,
+            old_values=json.dumps(old_values) if old_values else None,
+            new_values=json.dumps(new_values) if new_values else None,
+            ip_address=request.remote_addr if request else None,
+            user_agent=request.headers.get('User-Agent') if request else None
+        )
+        db.session.add(audit_log)
+        db.session.commit()
+        return audit_log
+
+    @staticmethod
+    def get_user_audit_logs(user_id, page=1, per_page=20):
+        """الحصول على سجلات التدقيق للمستخدم"""
+        return AuditLog.query.filter_by(user_id=user_id) \
+            .order_by(AuditLog.created_at.desc()) \
+            .paginate(page=page, per_page=per_page, error_out=False)
+
+    @staticmethod
+    def get_table_audit_logs(table_name, record_id=None, page=1, per_page=20):
+        """الحصول على سجلات التدقيق لجدول معين"""
+        query = AuditLog.query.filter_by(table_name=table_name)
+        if record_id:
+            query = query.filter_by(record_id=record_id)
+
+        return query.order_by(AuditLog.created_at.desc()) \
+            .paginate(page=page, per_page=per_page, error_out=False)
+
+    @staticmethod
+    def search_audit_logs(search_term, page=1, per_page=20):
+        """بحث في سجلات التدقيق"""
+        return AuditLog.query.filter(
+            db.or_(
+                AuditLog.action.ilike(f'%{search_term}%'),
+                AuditLog.table_name.ilike(f'%{search_term}%'),
+                AuditLog.old_values.ilike(f'%{search_term}%'),
+                AuditLog.new_values.ilike(f'%{search_term}%')
+            )
+        ).order_by(AuditLog.created_at.desc()) \
+            .paginate(page=page, per_page=per_page, error_out=False)
+
+
+class NotificationService:
+
+    @staticmethod
+    def create_notification(user_id, title, message, notification_type='info', related_url=None):
+        """إنشاء إشعار جديد"""
+        notification = Notification(
+            user_id=user_id,
+            title=title,
+            message=message,
+            notification_type=notification_type,
+            related_url=related_url
+        )
+        db.session.add(notification)
+        db.session.commit()
+        return notification
+
+    @staticmethod
+    def get_user_notifications(user_id, unread_only=False, page=1, per_page=10):
+        """الحصول على إشعارات المستخدم"""
+        query = Notification.query.filter_by(user_id=user_id)
+
+        if unread_only:
+            query = query.filter_by(is_read=False)
+
+        return query.order_by(Notification.created_at.desc()) \
+            .paginate(page=page, per_page=per_page, error_out=False)
+
+    @staticmethod
+    def mark_as_read(notification_id, user_id):
+        """تحديد الإشعار كمقروء"""
+        notification = Notification.query.filter_by(id=notification_id, user_id=user_id).first()
+        if notification:
+            notification.is_read = True
+            db.session.commit()
+        return notification
+
+    @staticmethod
+    def mark_all_as_read(user_id):
+        """تحديد جميع إشعارات المستخدم كمقروءة"""
+        Notification.query.filter_by(user_id=user_id, is_read=False).update(
+            {'is_read': True}
+        )
+        db.session.commit()
+
+    @staticmethod
+    def get_unread_count(user_id):
+        """الحصول على عدد الإشعارات غير المقروءة"""
+        return Notification.query.filter_by(user_id=user_id, is_read=False).count()
+
+    @staticmethod
+    def delete_notification(notification_id, user_id):
+        """حذف إشعار"""
+        notification = Notification.query.filter_by(id=notification_id, user_id=user_id).first()
+        if notification:
+            db.session.delete(notification)
+            db.session.commit()
+        return notification
+

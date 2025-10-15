@@ -17,7 +17,7 @@
                     <h6 class="m-0 font-weight-bold text-primary">بيانات المستخدم</h6>
                 </div>
                 <div class="card-body">
-                    <form method="POST" novalidate>
+                    <form method="POST" novalidate id="userForm">
                         {{ form.hidden_tag() }}
 
                         <div class="row">
@@ -177,6 +177,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const companySelect = document.getElementById('company_id');
     const regionSelect = document.getElementById('region_ids');
     const previewDiv = document.getElementById('selectedRegionsPreview');
+    const userForm = document.getElementById('userForm');
+    const isEditMode = {{ 'true' if selected_user_id else 'false' }};
 
     // دالة لعرض المناطق المختارة
     function updateSelectedRegionsPreview() {
@@ -210,7 +212,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         let visibleCount = 0;
 
-        for (let option of regions) {
+        for (let i = 0; i < regions.length; i++) {
+            const option = regions[i];
             if (!option.value) continue;
 
             const regionCompanyId = option.getAttribute('data-company');
@@ -226,7 +229,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // إذا لم يتم اختيار شركة، عرض جميع المناطق
         if (!companyId) {
-            for (let option of regions) {
+            for (let i = 0; i < regions.length; i++) {
+                const option = regions[i];
                 option.style.display = 'block';
                 option.disabled = false;
             }
@@ -254,7 +258,9 @@ document.addEventListener('DOMContentLoaded', function() {
         companySelect.addEventListener('change', filterRegionsByCompany);
     }
 
-    regionSelect.addEventListener('change', updateSelectedRegionsPreview);
+    if (regionSelect) {
+        regionSelect.addEventListener('change', updateSelectedRegionsPreview);
+    }
 
     // التنفيذ الأولي
     filterRegionsByCompany();
@@ -278,7 +284,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // إضافة search للمناطق إذا كانت كثيرة
-    if (regionSelect.options.length > 10) {
+    if (regionSelect && regionSelect.options.length > 10) {
         const searchDiv = document.createElement('div');
         searchDiv.className = 'mb-2';
         searchDiv.innerHTML = `
@@ -291,7 +297,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const searchTerm = this.value.toLowerCase();
             const regions = regionSelect.options;
 
-            for (let option of regions) {
+            for (let i = 0; i < regions.length; i++) {
+                const option = regions[i];
                 if (!option.value) continue;
 
                 const regionText = option.text.toLowerCase();
@@ -301,42 +308,102 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    // التحقق من النموذج قبل الإرسال
+    if (userForm) {
+        userForm.addEventListener('submit', function(e) {
+            const password = document.getElementById('password') ? document.getElementById('password').value : '';
+            const passwordConfirm = document.getElementById('password_confirm') ? document.getElementById('password_confirm').value : '';
+            const selectedRegions = regionSelect ? Array.from(regionSelect.selectedOptions) : [];
+
+            // التحقق من اختيار منطقة واحدة على الأقل
+            if (selectedRegions.length === 0) {
+                e.preventDefault();
+                showAlert('يجب اختيار منطقة واحدة على الأقل', 'warning');
+                if (regionSelect) regionSelect.focus();
+                return false;
+            }
+
+            // إذا كان وضع التعديل وكلمة المرور فارغة، تخطي التحقق
+            if (isEditMode && !password) {
+                return true;
+            }
+
+            // التحقق من كلمة المرور
+            if (password !== passwordConfirm) {
+                e.preventDefault();
+                showAlert('كلمتا المرور غير متطابقتين', 'error');
+                return false;
+            }
+
+            if (password.length < 6 && !(isEditMode && !password)) {
+                e.preventDefault();
+                showAlert('كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'error');
+                return false;
+            }
+
+            return true;
+        });
+    }
+
+    // دالة لعرض التنبيهات
+    function showAlert(message, type = 'info') {
+        // إزالة أي تنبيهات سابقة
+        const existingAlert = document.querySelector('.custom-alert');
+        if (existingAlert) {
+            existingAlert.remove();
+        }
+
+        const alertClass = type === 'error' ? 'alert-danger' :
+                          type === 'warning' ? 'alert-warning' : 'alert-info';
+
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert ${alertClass} custom-alert alert-dismissible fade show`;
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+
+        // إضافة التنبيه في أعلى الصفحة
+        const container = document.querySelector('.container-fluid');
+        container.insertBefore(alertDiv, container.firstChild);
+
+        // إزالة التنبيه تلقائياً بعد 5 ثوانٍ
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.remove();
+            }
+        }, 5000);
+    }
+
+    // تحسين اختيار المناطق
+    if (regionSelect) {
+        // تمكين الاختيار المتعدد بالزر الأيمن
+        regionSelect.addEventListener('mousedown', function(e) {
+            if (e.button === 2) { // الزر الأيمن
+                e.preventDefault();
+                const option = e.target;
+                if (option.tagName === 'OPTION') {
+                    option.selected = !option.selected;
+                    updateSelectedRegionsPreview();
+                }
+            }
+        });
+
+        // منع القائمة السياقية للزر الأيمن
+        regionSelect.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+        });
+    }
 });
 
-// التحقق من كلمة المرور
-document.querySelector('form').addEventListener('submit', function(e) {
-    const password = document.getElementById('password').value;
-    const passwordConfirm = document.getElementById('password_confirm').value;
-    const isEditMode = {{ 'true' if selected_user_id else 'false' }};
-    const regionSelect = document.getElementById('region_ids');
-    const selectedRegions = Array.from(regionSelect.selectedOptions);
-
-    // التحقق من اختيار منطقة واحدة على الأقل
-    if (selectedRegions.length === 0) {
-        e.preventDefault();
-        alert('يجب اختيار منطقة واحدة على الأقل');
-        regionSelect.focus();
-        return false;
-    }
-
-    // إذا كان وضع التعديل وكلمة المرور فارغة، تخطي التحقق
-    if (isEditMode && !password) {
-        return true;
-    }
-
-    // التحقق من كلمة المرور
-    if (password !== passwordConfirm) {
-        e.preventDefault();
-        alert('كلمتا المرور غير متطابقتين');
-        return false;
-    }
-
-    if (password.length < 6 && !(isEditMode && !password)) {
-        e.preventDefault();
-        alert('كلمة المرور يجب أن تكون 6 أحرف على الأقل');
-        return false;
-    }
-});
+// تهيئة مكتبة Bootstrap إذا كانت مستخدمة
+if (typeof bootstrap !== 'undefined') {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+}
 </script>
 
 <style>
@@ -386,6 +453,8 @@ document.querySelector('form').addEventListener('submit', function(e) {
     background: #f8f9fa;
     border-radius: 8px;
     border-right: 3px solid #28a745;
+    display: flex;
+    align-items: center;
 }
 
 .selected-regions-list {
@@ -397,14 +466,16 @@ document.querySelector('form').addEventListener('submit', function(e) {
     padding: 8px 12px;
     margin: 2px 0;
     border-radius: 4px;
+    transition: all 0.2s ease;
 }
 
 #region_ids option:hover {
     background: #e9ecef;
+    transform: translateX(5px);
 }
 
 #region_ids option:checked {
-    background: #667eea;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
 }
 
@@ -412,6 +483,73 @@ document.querySelector('form').addEventListener('submit', function(e) {
 #regionSearch {
     border-radius: 20px;
     padding: 8px 15px;
+    border: 1px solid #ddd;
+    transition: all 0.3s ease;
+}
+
+#regionSearch:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+}
+
+/* تنسيق التنبيهات المخصصة */
+.custom-alert {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    min-width: 300px;
+    animation: slideInRight 0.5s ease;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* تحسين التجاوب */
+@media (max-width: 768px) {
+    .container-fluid {
+        padding: 10px;
+    }
+
+    .card-body {
+        padding: 15px;
+    }
+
+    #region_ids {
+        font-size: 14px;
+    }
+
+    .selected-region-item {
+        font-size: 12px;
+        padding: 6px 8px;
+    }
+}
+
+/* تأثيرات hover للأزرار */
+.btn {
+    transition: all 0.3s ease;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+/* تنسيق حقول الإدخال */
+.form-control, .form-select {
+    transition: all 0.3s ease;
+}
+
+.form-control:focus, .form-select:focus {
+    transform: translateY(-1px);
 }
 </style>
 {% endblock %}

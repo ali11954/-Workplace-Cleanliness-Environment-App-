@@ -105,9 +105,29 @@
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">بحث:</label>
-                    <input type="text" class="form-control" id="searchInput" placeholder="ابحث بالاسم أو البريد...">
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="searchInput" placeholder="ابحث بالاسم أو البريد...">
+                        <button class="btn btn-outline-secondary" type="button" id="clearSearch">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- عدادات النتائج -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div id="resultsCount" class="text-muted">
+            عرض <span class="fw-bold">{{ users|length }}</span> مستخدم
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-primary btn-sm" id="exportBtn">
+                <i class="fas fa-download me-1"></i>تصدير
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" id="resetFilters">
+                <i class="fas fa-redo me-1"></i>إعادة التعيين
+            </button>
         </div>
     </div>
 
@@ -119,7 +139,7 @@
              data-role="{{ user.role }}"
              data-status="{{ 'active' if user.active else 'inactive' }}"
              data-company="{{ user.company_id }}"
-             data-search="{{ user.fullname.lower() }} {{ user.username.lower() }} {{ user.email.lower() if user.email else '' }}">
+             data-search="{{ user.fullname.lower() }} {{ user.username.lower() }} {{ user.email.lower() if user.email else '' }} {{ user.company.name.lower() if user.company else '' }}">
             <div class="card shadow-sm h-100 user-card {% if not user.active %}user-inactive{% endif %}">
                 <div class="card-header d-flex justify-content-between align-items-center user-card-header {{ user.role }}">
                     <div class="d-flex align-items-center">
@@ -134,7 +154,7 @@
                             <i class="fas fa-user text-secondary"></i>
                             {% endif %}
                         </div>
-                        <span class="fw-bold">{{ user.fullname }}</span>
+                        <span class="fw-bold">{{ user.fullname or user.username }}</span>
                     </div>
                     <span class="badge user-role-badge {{ user.role }}">
                         {{ user.role|replace('admin', 'مسؤول')|replace('supervisor', 'مشرف')|replace('sub_admin', 'مشرف فرعي')|replace('user', 'مستخدم') }}
@@ -146,23 +166,28 @@
                     <div class="user-info">
                         <div class="info-item">
                             <i class="fas fa-user me-2 text-muted"></i>
-                            <strong>اسم المستخدم:</strong> {{ user.username }}
+                            <strong>اسم المستخدم:</strong>
+                            <span class="text-mono">{{ user.username }}</span>
                         </div>
                         <div class="info-item">
                             <i class="fas fa-envelope me-2 text-muted"></i>
-                            <strong>البريد:</strong> {{ user.email or 'غير محدد' }}
+                            <strong>البريد:</strong>
+                            <span class="text-truncate">{{ user.email or 'غير محدد' }}</span>
                         </div>
                         <div class="info-item">
                             <i class="fas fa-building me-2 text-muted"></i>
-                            <strong>الشركة:</strong> {{ user.company.name if user.company else 'غير محدد' }}
+                            <strong>الشركة:</strong>
+                            {{ user.company.name if user.company else 'غير محدد' }}
                         </div>
                         <div class="info-item">
                             <i class="fas fa-map-marker-alt me-2 text-muted"></i>
                             <strong>المناطق:</strong>
                             {% if user.regions %}
-                                {% for region in user.regions %}
-                                    <span class="badge bg-light text-dark me-1">{{ region.name }}</span>
-                                {% endfor %}
+                                <div class="mt-1">
+                                    {% for region in user.regions %}
+                                        <span class="badge bg-light text-dark me-1 mb-1">{{ region.name }}</span>
+                                    {% endfor %}
+                                </div>
                             {% else %}
                                 <span class="text-muted">غير محددة</span>
                             {% endif %}
@@ -181,22 +206,30 @@
                             مسؤول نظام
                         </span>
                         {% endif %}
+                        {% if user.last_login %}
+                        <span class="badge bg-info">
+                            <i class="fas fa-clock me-1"></i>
+                            آخر دخول: {{ user.last_login.strftime('%Y-%m-%d') if user.last_login is string else user.last_login.strftime('%Y-%m-%d') }}
+                        </span>
+                        {% endif %}
                     </div>
 
                     <!-- الصلاحيات -->
                     {% if user.user_permissions %}
                     <div class="user-permissions">
-                        <small class="text-muted">الصلاحيات المخصصة:</small>
+                        <small class="text-muted d-block mb-1">الصلاحيات المخصصة:</small>
                         <div class="permissions-list">
                             {% for perm in user.user_permissions %}
-                            <span class="badge bg-light text-dark mb-1">{{ perm.permission_code }}</span>
+                            <span class="badge bg-light text-dark mb-1" title="{{ perm.permission_code }}">
+                                {{ perm.permission_code|replace('_', ' ')|title }}
+                            </span>
                             {% endfor %}
                         </div>
                     </div>
                     {% endif %}
 
                     <!-- أزرار التحكم -->
-                    <div class="d-flex gap-2 flex-wrap mt-auto">
+                    <div class="d-flex gap-2 flex-wrap mt-auto pt-3 border-top">
                         {% if current_user.has_permission('users_edit') and current_user.can_manage_user(user) %}
                         <a href="{{ url_for('edit_user', user_id=user.id) }}" class="btn btn-warning btn-sm shadow-sm flex-fill">
                             <i class="fas fa-edit me-1"></i>تعديل
@@ -204,13 +237,19 @@
                         {% endif %}
 
                         {% if current_user.has_permission('users_delete') and current_user.can_manage_user(user) and user.username != 'admin' %}
-                        <form action="{{ url_for('delete_user', user_id=user.id) }}" method="POST" class="d-inline flex-fill"
-                              onsubmit="return confirm('هل أنت متأكد من حذف المستخدم {{ user.fullname }}؟');">
+                        <form action="{{ url_for('delete_user', user_id=user.id) }}" method="POST" class="d-inline flex-fill delete-form">
                             <button type="submit" class="btn btn-danger btn-sm shadow-sm w-100">
                                 <i class="fas fa-trash me-1"></i>حذف
                             </button>
                         </form>
                         {% endif %}
+
+                        <!-- زر عرض التفاصيل -->
+                        <button class="btn btn-info btn-sm shadow-sm flex-fill user-details-btn"
+                                data-user-id="{{ user.id }}"
+                                data-user-name="{{ user.fullname or user.username }}">
+                            <i class="fas fa-eye me-1"></i>تفاصيل
+                        </button>
                     </div>
                 </div>
             </div>
@@ -231,6 +270,21 @@
     </div>
     {% endif %}
 </div>
+
+<!-- Modal لعرض التفاصيل -->
+<div class="modal fade" id="userDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">تفاصيل المستخدم</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="userDetailsContent">
+                <!-- سيتم تحميل المحتوى هنا عبر JavaScript -->
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block styles %}
@@ -240,10 +294,19 @@
     border-radius: 15px;
     border: none;
     transition: transform 0.3s ease;
+    cursor: pointer;
 }
 
 .stat-card:hover {
     transform: translateY(-5px);
+}
+
+.text-mono {
+    font-family: 'Courier New', monospace;
+    background: #f8f9fa;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.85em;
 }
 
 /* ===================== بطاقات المستخدمين ===================== */
@@ -252,6 +315,7 @@
     overflow: hidden;
     border: none;
     transition: all 0.3s ease;
+    position: relative;
 }
 
 .user-card:hover {
@@ -262,6 +326,19 @@
 .user-inactive {
     opacity: 0.7;
     background-color: #f8f9fa;
+}
+
+.user-inactive::before {
+    content: "غير نشط";
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: #dc3545;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    z-index: 1;
 }
 
 /* ===================== رؤوس البطاقات حسب الدور ===================== */
@@ -322,20 +399,28 @@
 
 .info-item {
     display: flex;
-    align-items: center;
-    margin-bottom: 8px;
+    align-items: flex-start;
+    margin-bottom: 10px;
     font-size: 0.9rem;
+    line-height: 1.4;
 }
 
 .info-item strong {
     min-width: 80px;
-    margin-left: 5px;
+    margin-left: 8px;
+    flex-shrink: 0;
+}
+
+.info-item > span:last-child {
+    flex: 1;
+    word-break: break-word;
 }
 
 .user-status {
     display: flex;
     gap: 5px;
     flex-wrap: wrap;
+    margin: 10px 0;
 }
 
 .user-permissions {
@@ -348,6 +433,27 @@
     flex-wrap: wrap;
     gap: 3px;
     margin-top: 5px;
+}
+
+.permissions-list .badge {
+    font-size: 0.7rem;
+    cursor: help;
+}
+
+/* ===================== تأثيرات البطاقات ===================== */
+.user-card-item {
+    animation: fadeInUp 0.5s ease;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* ===================== التجاوب ===================== */
@@ -366,6 +472,37 @@
         margin-left: 0;
         margin-bottom: 2px;
     }
+
+    .card-body .d-flex {
+        flex-direction: column;
+    }
+
+    .card-body .btn {
+        margin-bottom: 5px;
+    }
+}
+
+/* ===================== عدادات النتائج ===================== */
+#resultsCount {
+    font-size: 0.9rem;
+}
+
+/* ===================== تأثيرات الأزرار ===================== */
+.btn {
+    transition: all 0.3s ease;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+}
+
+.delete-form button:hover {
+    transform: translateY(-1px) scale(1.02);
+}
+
+/* ===================== شريط البحث ===================== */
+.input-group .btn {
+    border-radius: 0 0.375rem 0.375rem 0;
 }
 </style>
 {% endblock %}
@@ -377,13 +514,22 @@ document.addEventListener('DOMContentLoaded', function() {
     const statusFilter = document.getElementById('statusFilter');
     const companyFilter = document.getElementById('companyFilter');
     const searchInput = document.getElementById('searchInput');
+    const clearSearch = document.getElementById('clearSearch');
+    const resetFilters = document.getElementById('resetFilters');
+    const exportBtn = document.getElementById('exportBtn');
     const userCards = document.querySelectorAll('.user-card-item');
+    const resultsCount = document.getElementById('resultsCount');
+    const userDetailsModal = new bootstrap.Modal(document.getElementById('userDetailsModal'));
+    const userDetailsContent = document.getElementById('userDetailsContent');
 
+    // دالة فلترة المستخدمين
     function filterUsers() {
         const roleValue = roleFilter.value;
         const statusValue = statusFilter.value;
         const companyValue = companyFilter.value;
-        const searchValue = searchInput.value.toLowerCase();
+        const searchValue = searchInput.value.toLowerCase().trim();
+
+        let visibleCount = 0;
 
         userCards.forEach(card => {
             const role = card.getAttribute('data-role');
@@ -398,10 +544,138 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (roleMatch && statusMatch && companyMatch && searchMatch) {
                 card.style.display = 'block';
+                visibleCount++;
+                // إضافة تأثير ظهور
+                card.style.animation = 'fadeInUp 0.5s ease';
             } else {
                 card.style.display = 'none';
             }
         });
+
+        // تحديث عداد النتائج
+        updateResultsCount(visibleCount);
+    }
+
+    // دالة تحديث عداد النتائج
+    function updateResultsCount(count) {
+        resultsCount.innerHTML = `عرض <span class="fw-bold">${count}</span> من أصل <span class="fw-bold">${userCards.length}</span> مستخدم`;
+
+        // تغيير لون العداد إذا كانت النتائج قليلة
+        if (count === 0) {
+            resultsCount.classList.add('text-danger');
+            resultsCount.classList.remove('text-muted');
+        } else {
+            resultsCount.classList.remove('text-danger');
+            resultsCount.classList.add('text-muted');
+        }
+    }
+
+    // دالة إعادة تعيين الفلاتر
+    function resetAllFilters() {
+        roleFilter.value = '';
+        statusFilter.value = '';
+        companyFilter.value = '';
+        searchInput.value = '';
+        filterUsers();
+
+        // إظهار رسالة نجاح
+        showToast('تم إعادة تعيين جميع الفلاتر', 'success');
+    }
+
+    // دالة عرض التنبيهات
+    function showToast(message, type = 'info') {
+        // يمكنك إضافة مكتبة Toast هنا أو استخدام alert بسيط
+        const alertClass = type === 'success' ? 'alert-success' :
+                          type === 'error' ? 'alert-danger' : 'alert-info';
+
+        // إنشاء عنصر toast بسيط
+        const toast = document.createElement('div');
+        toast.className = `alert ${alertClass} alert-dismissible fade show position-fixed`;
+        toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+        toast.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+
+        document.body.appendChild(toast);
+
+        // إزالة Toast تلقائياً بعد 3 ثوان
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.remove();
+            }
+        }, 3000);
+    }
+
+    // دالة تصدير البيانات
+    function exportData() {
+        const visibleUsers = Array.from(userCards)
+            .filter(card => card.style.display !== 'none')
+            .map(card => {
+                const userName = card.querySelector('.fw-bold').textContent;
+                const userRole = card.querySelector('.user-role-badge').textContent;
+                const userStatus = card.querySelector('.user-status .badge').textContent;
+                return { userName, userRole, userStatus };
+            });
+
+        // في تطبيق حقيقي، هنا سيتم إرسال طلب إلى الخادم لتصدير البيانات
+        showToast('سيتم تصدير البيانات قريباً...', 'info');
+        console.log('بيانات التصدير:', visibleUsers);
+    }
+
+    // دالة عرض تفاصيل المستخدم
+    function showUserDetails(userId, userName) {
+        // في تطبيق حقيقي، هنا سيتم جلب البيانات من الخادم
+        userDetailsContent.innerHTML = `
+            <div class="text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">جاري التحميل...</span>
+                </div>
+                <p class="mt-2">جاري تحميل تفاصيل المستخدم...</p>
+            </div>
+        `;
+
+        userDetailsModal.show();
+
+        // محاكاة جلب البيانات (في التطبيق الحقيقي استخدم fetch أو axios)
+        setTimeout(() => {
+            userDetailsContent.innerHTML = `
+                <h6>تفاصيل المستخدم: ${userName}</h6>
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>رقم المستخدم:</strong> ${userId}</p>
+                        <p><strong>الحالة:</strong> <span class="badge bg-success">نشط</span></p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>تاريخ الإنشاء:</strong> ${new Date().toLocaleDateString('ar-SA')}</p>
+                        <p><strong>آخر تحديث:</strong> ${new Date().toLocaleDateString('ar-SA')}</p>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <h6>الإحصائيات</h6>
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <div class="border rounded p-2">
+                                <h5 class="text-primary mb-0">12</h5>
+                                <small>تقييم</small>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="border rounded p-2">
+                                <h5 class="text-success mb-0">8</h5>
+                                <small>منطقة</small>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="border rounded p-2">
+                                <h5 class="text-info mb-0">24</h5>
+                                <small>نشاط</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }, 1000);
     }
 
     // إضافة مستمعي الأحداث
@@ -410,15 +684,72 @@ document.addEventListener('DOMContentLoaded', function() {
     companyFilter.addEventListener('change', filterUsers);
     searchInput.addEventListener('input', filterUsers);
 
-    // فلترة أولية
+    clearSearch.addEventListener('click', function() {
+        searchInput.value = '';
+        filterUsers();
+    });
+
+    resetFilters.addEventListener('click', resetAllFilters);
+    exportBtn.addEventListener('click', exportData);
+
+    // إضافة مستمعي الأحداث لأزرار التفاصيل
+    document.querySelectorAll('.user-details-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const userId = this.getAttribute('data-user-id');
+            const userName = this.getAttribute('data-user-name');
+            showUserDetails(userId, userName);
+        });
+    });
+
+    // إضافة تأكيد للحذف
+    document.querySelectorAll('.delete-form').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            if (!confirm('⚠️ هل أنت متأكد من حذف هذا المستخدم؟ لا يمكن التراجع عن هذا الإجراء.')) {
+                e.preventDefault();
+            }
+        });
+    });
+
+    // فلترة أولية وعرض العداد
     filterUsers();
+
+    // إضافة تأثيرات للبطاقات عند التمرير
+    const observerOptions = {
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px'
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.opacity = '1';
+                entry.target.style.transform = 'translateY(0)';
+            }
+        });
+    }, observerOptions);
+
+    userCards.forEach(card => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+        card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+        observer.observe(card);
+    });
+
+    // تحسين تجربة المستخدم على الأجهزة المحمولة
+    if (window.innerWidth < 768) {
+        document.querySelectorAll('.user-card').forEach(card => {
+            card.style.marginBottom = '15px';
+        });
+    }
 });
 
-// وظيفة للبحث السريع
+// دالة مساعدة للبحث السريع من أي مكان في التطبيق
 function quickSearch(query) {
     const searchInput = document.getElementById('searchInput');
-    searchInput.value = query;
-    searchInput.dispatchEvent(new Event('input'));
+    if (searchInput) {
+        searchInput.value = query;
+        searchInput.dispatchEvent(new Event('input'));
+    }
 }
 </script>
 {% endblock %}

@@ -2,47 +2,543 @@
 {% block title %}إدارة الجهات المسؤولة{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
-    <h2 class="mb-4 text-center text-primary fw-bold">الجهات المسؤولة عن التقييم</h2>
-
-    <!-- إضافة جهة -->
-    <form method="POST" class="mb-4">
-        {{ form.hidden_tag() }}
-        <div class="input-group">
-            {{ form.name(class="form-control shadow-sm", placeholder="اسم الجهة") }}
-            <button class="btn btn-success shadow-sm">{{ form.submit.label }}</button>
+<div class="container-fluid py-4">
+    <!-- رأس الصفحة -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="text-primary fw-bold mb-2">🏛️ إدارة الجهات المسؤولة</h2>
+            <p class="text-muted mb-0">إدارة الجهات المسؤولة عن تقييم المعايير</p>
         </div>
-    </form>
+        <div class="d-flex gap-2">
+            {% if current_user.is_administrator %}
+            <button class="btn btn-outline-primary btn-sm" id="toggleFilters">
+                <i class="fas fa-filter me-1"></i>الفلاتر
+            </button>
+            {% endif %}
+        </div>
+    </div>
 
-    {% if authorities %}
-    <div class="row g-4">
-        {% for auth in authorities %}
-        <div class="col-md-4">
-            <div class="card shadow-sm border-0 h-100" style="background-color:#e9f7ef; border-left: 5px solid #198754;">
-                <div class="card-header fw-bold" style="background-color:#198754; color:white;">
-                    🏛️ {{ auth.name }}
+    <!-- بطاقة الإحصائيات -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card stat-card bg-light-primary text-dark">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-0">{{ authorities|length }}</h4>
+                            <p class="mb-0">إجمالي الجهات</p>
+                        </div>
+                        <i class="fas fa-building fa-2x text-primary opacity-50"></i>
+                    </div>
                 </div>
-                <div class="card-body d-flex flex-column gap-2">
-                    <!-- تعديل -->
-                    <form action="{{ url_for('edit_authority', auth_id=auth.id) }}" method="POST" class="d-flex gap-2 flex-wrap">
-                        <input type="text" name="new_name" class="form-control shadow-sm" placeholder="اسم جديد" required>
-                        <button class="btn btn-success btn-sm shadow-sm">✏️ تعديل</button>
-                                      <form action="{{ url_for('delete_authority', auth_id=auth.id) }}" method="POST" onsubmit="return confirm('هل أنت متأكد من الحذف؟');">
-                        <button class="btn btn-danger btn-sm shadow-sm">🗑️ حذف</button>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card bg-light-success text-dark">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-0">{{ companies|length }}</h4>
+                            <p class="mb-0">الشركات</p>
+                        </div>
+                        <i class="fas fa-landmark fa-2x text-success opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card bg-light-info text-dark">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-0">{{ active_companies }}</h4>
+                            <p class="mb-0">شركات نشطة</p>
+                        </div>
+                        <i class="fas fa-check-circle fa-2x text-info opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card bg-light-warning text-dark">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-0">{{ authorities_with_criteria }}</h4>
+                            <p class="mb-0">جهات مرتبطة بمعايير</p>
+                        </div>
+                        <i class="fas fa-link fa-2x text-warning opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-                    <!-- حذف -->
-                    </form>
+    <!-- فلترة الجهات (للمسؤولين فقط) -->
+    {% if current_user.is_administrator and companies|length > 1 %}
+    <div class="card shadow-sm mb-4" id="filtersCard" style="display: none;">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-bold text-muted">فلترة حسب الشركة:</label>
+                    <select class="form-select" id="companyFilter">
+                        <option value="0">جميع الشركات</option>
+                        {% for company in companies %}
+                        <option value="{{ company.id }}" {% if selected_company == company.id %}selected{% endif %}>
+                            {{ company.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-bold text-muted">بحث سريع:</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="searchInput" placeholder="ابحث باسم الجهة...">
+                        <button class="btn btn-outline-secondary" type="button" id="clearSearch">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- نموذج إضافة جهة جديدة -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-light py-3">
+            <h6 class="mb-0 fw-bold text-primary">
+                <i class="fas fa-plus-circle me-2"></i>إضافة جهة جديدة
+            </h6>
+        </div>
+        <div class="card-body">
+            <form method="POST" class="row g-3">
+                {{ form.hidden_tag() }}
+
+                <div class="col-md-6">
+                    {{ form.name.label(class="form-label fw-bold text-muted") }}
+                    {{ form.name(class="form-control shadow-sm", placeholder="أدخل اسم الجهة المسؤولة") }}
+                    {% for error in form.name.errors %}
+                        <div class="text-danger small mt-1">{{ error }}</div>
+                    {% endfor %}
+                </div>
+
+                <div class="col-md-4">
+                    {{ form.company_id.label(class="form-label fw-bold text-muted") }}
+                    {{ form.company_id(class="form-select shadow-sm") }}
+                    {% for error in form.company_id.errors %}
+                        <div class="text-danger small mt-1">{{ error }}</div>
+                    {% endfor %}
+                </div>
+
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary shadow-sm w-100">
+                        <i class="fas fa-plus me-1"></i>إضافة
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- قائمة الجهات -->
+    {% if authorities %}
+    <div class="row g-4" id="authoritiesContainer">
+        {% for auth in authorities %}
+        <div class="col-xl-4 col-lg-6 authority-card-item"
+             data-company="{{ auth.company_id }}"
+             data-search="{{ auth.name.lower() }} {{ auth.company.name.lower() if auth.company else '' }}">
+            <div class="card shadow-sm h-100 authority-card">
+                <div class="card-header d-flex justify-content-between align-items-center py-3"
+                     style="background: linear-gradient(135deg, #e3f2fd, #bbdefb); border-left: 4px solid #2196F3;">
+                    <div class="d-flex align-items-center">
+                        <div class="authority-avatar me-3">
+                            <i class="fas fa-building fa-lg text-primary"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-0 fw-bold text-dark">{{ auth.name }}</h6>
+                            <small class="text-muted">
+                                <i class="fas fa-landmark me-1"></i>
+                                {{ auth.company.name if auth.company else 'غير محدد' }}
+                            </small>
+                        </div>
+                    </div>
+                    <span class="badge bg-light text-primary">
+                        <i class="fas fa-hashtag me-1"></i>{{ auth.id }}
+                    </span>
+                </div>
+
+                <div class="card-body d-flex flex-column gap-3">
+                    <!-- معلومات الجهة -->
+                    <div class="authority-info">
+                        <div class="info-item">
+                            <i class="fas fa-calendar me-2 text-muted"></i>
+                            <small class="text-muted">تم الإنشاء:</small>
+                            <span class="fw-bold">{{ auth.created_at.strftime('%Y-%m-%d') if auth.created_at else 'غير محدد' }}</span>
+                        </div>
+
+                        <!-- عدد المعايير المرتبطة -->
+                        <div class="info-item">
+                            <i class="fas fa-list-check me-2 text-muted"></i>
+                            <small class="text-muted">المعايير المرتبطة:</small>
+                            <span class="badge {% if auth.criteria %}bg-success{% else %}bg-light text-muted{% endif %}">
+                                {{ auth.criteria|length if auth.criteria else 0 }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- أزرار التحكم -->
+                    <div class="d-flex gap-2 flex-wrap mt-auto pt-3 border-top">
+                        <!-- تعديل -->
+                        <button class="btn btn-warning btn-sm shadow-sm flex-fill edit-authority-btn"
+                                data-auth-id="{{ auth.id }}"
+                                data-auth-name="{{ auth.name }}"
+                                data-company-id="{{ auth.company_id }}">
+                            <i class="fas fa-edit me-1"></i>تعديل
+                        </button>
+
+                        <!-- حذف -->
+                        {% if auth.criteria|length == 0 %}
+                        <form action="{{ url_for('delete_authority', auth_id=auth.id) }}" method="POST"
+                              class="d-inline flex-fill delete-form">
+                            <button type="submit" class="btn btn-danger btn-sm shadow-sm w-100"
+                                    onclick="return confirm('هل أنت متأكد من حذف الجهة \"{{ auth.name }}\"؟')">
+                                <i class="fas fa-trash me-1"></i>حذف
+                            </button>
+                        </form>
+                        {% else %}
+                        <button class="btn btn-outline-danger btn-sm shadow-sm flex-fill" disabled
+                                title="لا يمكن الحذف - الجهة مرتبطة بمعايير">
+                            <i class="fas fa-ban me-1"></i>غير قابل للحذف
+                        </button>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
         </div>
         {% endfor %}
     </div>
     {% else %}
-    <p class="text-muted text-center mt-3">لا توجد جهات مسجلة بعد</p>
+    <!-- حالة عدم وجود جهات -->
+    <div class="text-center py-5">
+        <div class="empty-state">
+            <i class="fas fa-building fa-4x text-muted mb-3"></i>
+            <h4 class="text-muted">لا توجد جهات مسجلة</h4>
+            <p class="text-muted mb-4">لم يتم إضافة أي جهات مسؤولة عن التقييم بعد</p>
+            <button class="btn btn-primary" onclick="document.querySelector('form').scrollIntoView({behavior: 'smooth'})">
+                <i class="fas fa-plus me-2"></i>إضافة أول جهة
+            </button>
+        </div>
+    </div>
     {% endif %}
+</div>
+
+<!-- Modal للتعديل -->
+<div class="modal fade" id="editAuthorityModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title fw-bold text-primary">
+                    <i class="fas fa-edit me-2"></i>تعديل الجهة
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editAuthorityForm" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-muted">اسم الجهة:</label>
+                        <input type="text" class="form-control shadow-sm" id="editAuthorityName" name="new_name" required>
+                    </div>
+                    {% if current_user.is_administrator %}
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-muted">الشركة:</label>
+                        <select class="form-select shadow-sm" id="editAuthorityCompany" name="company_id">
+                            {% for company in companies %}
+                            <option value="{{ company.id }}">{{ company.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary flex-fill">
+                            <i class="fas fa-save me-1"></i>حفظ التغييرات
+                        </button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="fas fa-times me-1"></i>إلغاء
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
+{% block styles %}
+<style>
+/* ===================== التصميم العام ===================== */
+.stat-card {
+    border-radius: 12px;
+    border: none;
+    transition: all 0.3s ease;
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+}
+
+.stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.bg-light-primary { background: linear-gradient(135deg, #e3f2fd, #bbdefb); }
+.bg-light-success { background: linear-gradient(135deg, #e8f5e8, #c8e6c9); }
+.bg-light-info { background: linear-gradient(135deg, #e0f2f1, #b2dfdb); }
+.bg-light-warning { background: linear-gradient(135deg, #fff3e0, #ffccbc); }
+
+/* ===================== بطاقات الجهات ===================== */
+.authority-card {
+    border-radius: 12px;
+    border: none;
+    transition: all 0.3s ease;
+    background: #ffffff;
+}
+
+.authority-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+}
+
+.authority-card-header {
+    background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+    border-bottom: 1px solid #e3f2fd;
+}
+
+/* ===================== معلومات الجهة ===================== */
+.authority-avatar {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #2196F3, #1976D2);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+}
+
+.info-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+}
+
+.info-item i {
+    width: 20px;
+    text-align: center;
+}
+
+/* ===================== تأثيرات الأزرار ===================== */
+.btn {
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    border: none;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #2196F3, #1976D2);
+}
+
+.btn-warning {
+    background: linear-gradient(135deg, #FF9800, #F57C00);
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, #F44336, #D32F2F);
+}
+
+/* ===================== التجاوب ===================== */
+@media (max-width: 768px) {
+    .container-fluid {
+        padding: 10px;
+    }
+
+    .authority-card-item {
+        margin-bottom: 15px;
+    }
+
+    .card-body .d-flex {
+        flex-direction: column;
+    }
+
+    .card-body .btn {
+        margin-bottom: 5px;
+    }
+}
+
+/* ===================== حالة فارغة ===================== */
+.empty-state {
+    padding: 40px 20px;
+}
+
+.empty-state i {
+    opacity: 0.5;
+}
+
+/* ===================== تأثيرات الحقول ===================== */
+.form-control, .form-select {
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+    transition: all 0.3s ease;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #2196F3;
+    box-shadow: 0 0 0 0.2rem rgba(33, 150, 243, 0.1);
+}
+
+/* ===================== شارات ===================== */
+.badge {
+    border-radius: 6px;
+    font-weight: 500;
+}
+</style>
+{% endblock %}
+
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const companyFilter = document.getElementById('companyFilter');
+    const searchInput = document.getElementById('searchInput');
+    const clearSearch = document.getElementById('clearSearch');
+    const toggleFilters = document.getElementById('toggleFilters');
+    const filtersCard = document.getElementById('filtersCard');
+    const authorityCards = document.querySelectorAll('.authority-card-item');
+    const editAuthorityModal = new bootstrap.Modal(document.getElementById('editAuthorityModal'));
+    const editAuthorityForm = document.getElementById('editAuthorityForm');
+
+    // تبديل عرض الفلاتر
+    if (toggleFilters && filtersCard) {
+        toggleFilters.addEventListener('click', function() {
+            if (filtersCard.style.display === 'none') {
+                filtersCard.style.display = 'block';
+                toggleFilters.innerHTML = '<i class="fas fa-times me-1"></i>إخفاء الفلاتر';
+            } else {
+                filtersCard.style.display = 'none';
+                toggleFilters.innerHTML = '<i class="fas fa-filter me-1"></i>الفلاتر';
+            }
+        });
+    }
+
+    // فلترة الجهات
+    function filterAuthorities() {
+        const companyValue = companyFilter ? companyFilter.value : null;
+        const searchValue = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+        let visibleCount = 0;
+
+        authorityCards.forEach(card => {
+            const company = card.getAttribute('data-company');
+            const search = card.getAttribute('data-search');
+
+            const companyMatch = !companyValue || companyValue === '0' || company === companyValue;
+            const searchMatch = !searchValue || search.includes(searchValue);
+
+            if (companyMatch && searchMatch) {
+                card.style.display = 'block';
+                visibleCount++;
+                card.style.animation = 'fadeIn 0.5s ease';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+
+        // تحديث العداد إذا كان موجوداً
+        const resultsCount = document.getElementById('resultsCount');
+        if (resultsCount) {
+            resultsCount.textContent = `عرض ${visibleCount} جهة`;
+        }
+    }
+
+    // إضافة مستمعي الأحداث للفلاتر
+    if (companyFilter) companyFilter.addEventListener('change', filterAuthorities);
+    if (searchInput) searchInput.addEventListener('input', filterAuthorities);
+    if (clearSearch) {
+        clearSearch.addEventListener('click', function() {
+            searchInput.value = '';
+            filterAuthorities();
+        });
+    }
+
+    // إدارة أحداث التعديل
+    document.querySelectorAll('.edit-authority-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const authId = this.getAttribute('data-auth-id');
+            const authName = this.getAttribute('data-auth-name');
+            const companyId = this.getAttribute('data-company-id');
+
+            document.getElementById('editAuthorityName').value = authName;
+            if (document.getElementById('editAuthorityCompany')) {
+                document.getElementById('editAuthorityCompany').value = companyId;
+            }
+
+            // تحديث action الخاص بالنموذج
+            editAuthorityForm.action = `/authorities/edit/${authId}`;
+            editAuthorityModal.show();
+        });
+    });
+
+    // فلترة أولية
+    filterAuthorities();
+
+    // إضافة تأثيرات للبطاقات
+    const observerOptions = {
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px'
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.opacity = '1';
+                entry.target.style.transform = 'translateY(0)';
+            }
+        });
+    }, observerOptions);
+
+    authorityCards.forEach(card => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+        card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+        observer.observe(card);
+    });
+});
+
+// دالة مساعدة للبحث السريع
+function quickSearch(query) {
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.value = query;
+        searchInput.dispatchEvent(new Event('input'));
+    }
+}
+</script>
+
+<style>
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.authority-card-item {
+    animation: fadeIn 0.5s ease;
+}
+</style>
 {% endblock %}

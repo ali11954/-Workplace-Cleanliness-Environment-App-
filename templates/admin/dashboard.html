@@ -26,7 +26,672 @@
                 <span>النظام نشط</span>
             </div>
         </div>
+
+        <!-- عناصر التحكم في الهيدر -->
+        <div class="header-controls">
+            <!-- أيقونة الإشعارات -->
+            <div class="notification-widget">
+                <div class="notification-icon" id="notificationBell">
+                    <i class="fas fa-bell"></i>
+                    {% if unread_notifications_count > 0 %}
+                    <span class="notification-badge">{{ unread_notifications_count }}</span>
+                    {% endif %}
+                </div>
+                <div class="notification-dropdown" id="notificationDropdown">
+                    <div class="notification-header">
+                        <h5>الإشعارات</h5>
+                        <a href="{{ url_for('notifications_list') }}" class="view-all">عرض الكل</a>
+                    </div>
+                    <div class="notification-list">
+                        {% for notification in recent_notifications %}
+                        <div class="notification-item {% if not notification.is_read %}unread{% endif %}"
+                             data-notification-id="{{ notification.id }}">
+                            <div class="notification-content">
+                                <h6>{{ notification.title }}</h6>
+                                <p>{{ notification.message }}</p>
+                                <small>{{ notification.created_at|timesince }}</small>
+                            </div>
+                            {% if not notification.is_read %}
+                            <button class="mark-read-btn" onclick="markNotificationRead({{ notification.id }})">
+                                <i class="fas fa-check"></i>
+                            </button>
+                            {% endif %}
+                        </div>
+                        {% else %}
+                        <div class="empty-notifications">
+                            <i class="fas fa-bell-slash"></i>
+                            <p>لا توجد إشعارات جديدة</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- زر سجلات التدقيق السريع -->
+            <a href="{{ url_for('audit_logs_list') }}" class="quick-audit-btn">
+                <i class="fas fa-history"></i>
+                <span>سجلات النظام</span>
+            </a>
+        </div>
     </div>
+
+<style>
+:root {
+    --primary-color: #4CAF50;
+    --primary-light: #81C784;
+    --primary-dark: #388E3C;
+    --accent-color: #8BC34A;
+    --text-color: #333;
+    --light-bg: #F1F8E9;
+    --card-bg: #FFFFFF;
+    --shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    --primary: #4A90E2;
+    --success: #4BB543;
+    --warning: #FFB74D;
+    --danger: #E53E3E;
+    --info: #4FC3F7;
+    --dark: #2D3748;
+    --light: #F8FAFC;
+    --border-radius: 16px;
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+    background-color: var(--light-bg);
+    color: var(--text-color);
+    line-height: 1.6;
+}
+
+.main-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* تنسيقات الهيدر */
+.dashboard-header {
+    background: linear-gradient(135deg, var(--primary), #6C63FF);
+    color: white;
+    padding: 2rem;
+    border-radius: var(--border-radius);
+    margin-bottom: 2rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.dashboard-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 100%;
+    height: 100%;
+    background: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23ffffff' fill-opacity='0.1' fill-rule='evenodd'/%3E%3C/svg%3E");
+    opacity: 0.1;
+}
+
+.dashboard-title {
+    font-size: 2.2rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    position: relative;
+    z-index: 2;
+}
+
+.dashboard-subtitle {
+    font-size: 1.2rem;
+    opacity: 0.9;
+    margin-bottom: 1.5rem;
+    position: relative;
+    z-index: 2;
+}
+
+.status-bar {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    flex-wrap: wrap;
+    position: relative;
+    z-index: 2;
+}
+
+.status-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(255,255,255,0.2);
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    backdrop-filter: blur(10px);
+}
+
+/* أنماط عناصر التحكم في الهيدر */
+.header-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    position: absolute;
+    left: 2rem;
+    top: 2rem;
+}
+
+.notification-widget {
+    position: relative;
+}
+
+.notification-icon {
+    position: relative;
+    width: 50px;
+    height: 50px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: var(--transition);
+    color: white;
+    font-size: 1.2rem;
+}
+
+.notification-icon:hover {
+    background: rgba(255,255,255,0.3);
+    transform: scale(1.1);
+}
+
+.notification-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #FF4757;
+    color: white;
+    border-radius: 10px;
+    padding: 2px 6px;
+    font-size: 0.7rem;
+    font-weight: bold;
+    min-width: 18px;
+    text-align: center;
+}
+
+.notification-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 350px;
+    background: white;
+    border-radius: var(--border-radius);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+    transition: var(--transition);
+    z-index: 1000;
+}
+
+.notification-widget:hover .notification-dropdown {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.notification-header {
+    padding: 1rem;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.notification-header h5 {
+    margin: 0;
+    color: var(--dark);
+}
+
+.view-all {
+    color: var(--primary);
+    text-decoration: none;
+    font-size: 0.9rem;
+}
+
+.notification-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.notification-item {
+    padding: 1rem;
+    border-bottom: 1px solid #f1f3f4;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    transition: var(--transition);
+}
+
+.notification-item.unread {
+    background: #f8f9fa;
+}
+
+.notification-item:last-child {
+    border-bottom: none;
+}
+
+.notification-item:hover {
+    background: #f1f3f4;
+}
+
+.notification-content {
+    flex: 1;
+}
+
+.notification-content h6 {
+    margin: 0 0 0.25rem 0;
+    color: var(--dark);
+    font-size: 0.9rem;
+}
+
+.notification-content p {
+    margin: 0 0 0.5rem 0;
+    color: #64748B;
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
+.notification-content small {
+    color: #94a3b8;
+    font-size: 0.7rem;
+}
+
+.mark-read-btn {
+    background: none;
+    border: none;
+    color: var(--success);
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 4px;
+    transition: var(--transition);
+}
+
+.mark-read-btn:hover {
+    background: var(--success);
+    color: white;
+}
+
+.empty-notifications {
+    padding: 2rem 1rem;
+    text-align: center;
+    color: #94a3b8;
+}
+
+.empty-notifications i {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    opacity: 0.5;
+}
+
+.quick-audit-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(255,255,255,0.2);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 25px;
+    text-decoration: none;
+    transition: var(--transition);
+    font-size: 0.9rem;
+}
+
+.quick-audit-btn:hover {
+    background: rgba(255,255,255,0.3);
+    color: white;
+    transform: translateY(-2px);
+}
+
+/* ===================== تنسيقات فلتر الشركات ===================== */
+.company-filter-section {
+    margin: 2rem 0;
+    padding: 0 1rem;
+}
+
+.filter-card {
+    background: linear-gradient(135deg, var(--primary-light), var(--primary-color));
+    border-radius: 20px;
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+    border: none;
+    color: white;
+    position: relative;
+    overflow: hidden;
+}
+
+.filter-card::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 1%, transparent 1%);
+    background-size: 20px 20px;
+    transform: rotate(30deg);
+    animation: float 20s infinite linear;
+}
+
+@keyframes float {
+    0% { transform: rotate(30deg) translateX(0); }
+    100% { transform: rotate(30deg) translateX(-20px); }
+}
+
+.filter-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    position: relative;
+    z-index: 2;
+}
+
+.filter-header i {
+    font-size: 1.5rem;
+    margin-left: 0.75rem;
+    background: rgba(255,255,255,0.2);
+    padding: 0.75rem;
+    border-radius: 12px;
+}
+
+.filter-header h4 {
+    margin: 0;
+    font-weight: 600;
+    font-size: 1.3rem;
+}
+
+.filter-body {
+    position: relative;
+    z-index: 2;
+}
+
+.filter-form .form-group {
+    margin-bottom: 1rem;
+}
+
+.filter-form label {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    font-size: 0.95rem;
+}
+
+.filter-form label i {
+    margin-left: 0.5rem;
+    opacity: 0.9;
+}
+
+.select-style {
+    background: rgba(255,255,255,0.15);
+    border: 2px solid rgba(255,255,255,0.3);
+    border-radius: 12px;
+    color: white;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+    width: 100%;
+}
+
+.select-style:focus {
+    background: rgba(255,255,255,0.25);
+    border-color: rgba(255,255,255,0.5);
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.1);
+    outline: none;
+}
+
+.select-style option {
+    background: var(--primary-dark);
+    color: white;
+    padding: 0.5rem;
+}
+
+/* معلومات الشركة المحددة */
+.selected-company-info {
+    background: rgba(255,255,255,0.1);
+    border-radius: 15px;
+    padding: 1rem;
+    margin-top: 1rem;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.2);
+}
+
+.company-badge {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    font-size: 1rem;
+}
+
+.company-badge i {
+    color: #C8E6C9;
+    margin-left: 0.5rem;
+    font-size: 1.1rem;
+}
+
+.company-stats {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    background: rgba(255,255,255,0.15);
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.stat-item i {
+    margin-left: 0.3rem;
+    opacity: 0.8;
+    font-size: 0.8rem;
+}
+
+/* تنسيقات متجاوبة */
+@media (max-width: 768px) {
+    .header-controls {
+        position: static;
+        justify-content: center;
+        margin-top: 1rem;
+    }
+
+    .notification-dropdown {
+        width: 300px;
+        left: -125px;
+    }
+
+    .company-filter-section {
+        margin: 1rem 0;
+        padding: 0 0.5rem;
+    }
+
+    .filter-card {
+        padding: 1rem;
+        border-radius: 15px;
+    }
+
+    .filter-header {
+        flex-direction: column;
+        text-align: center;
+        gap: 0.5rem;
+    }
+
+    .filter-header i {
+        margin-left: 0;
+    }
+
+    .company-stats {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .stat-item {
+        justify-content: center;
+    }
+
+    .status-bar {
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .dashboard-title {
+        font-size: 1.8rem;
+    }
+}
+
+/* تأثيرات hover للفلتر */
+.filter-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.filter-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+}
+</style>
+
+<script>
+// تحديث الوقت الحي
+function updateLiveTime() {
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('liveTime').textContent = timeString;
+}
+
+// تحديث الوقت كل دقيقة
+setInterval(updateLiveTime, 60000);
+updateLiveTime();
+
+// تحسين تجربة المستخدم للفلتر
+document.addEventListener('DOMContentLoaded', function() {
+    const companySelect = document.getElementById('companySelect');
+    const filterForm = document.getElementById('companyFilterForm');
+
+    if (companySelect) {
+        // إضافة تأثير عند التغيير
+        companySelect.addEventListener('change', function() {
+            // إضافة تأثير تحميل
+            const submitBtn = document.createElement('button');
+            submitBtn.style.display = 'none';
+            submitBtn.type = 'submit';
+            filterForm.appendChild(submitBtn);
+            submitBtn.click();
+        });
+
+        // تحسين المظهر على الأجهزة المحمولة
+        if (window.innerWidth < 768) {
+            companySelect.style.fontSize = '16px'; // منع التكبير في iOS
+        }
+    }
+
+    // تأثيرات إضافية للبطاقة
+    const filterCard = document.querySelector('.filter-card');
+    if (filterCard) {
+        filterCard.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-5px) scale(1.02)';
+        });
+
+        filterCard.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(0) scale(1)';
+        });
+    }
+});
+
+// دوال الإشعارات
+function markNotificationRead(notificationId) {
+    fetch(`/notifications/mark-read/${notificationId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // تحديث الواجهة
+            const notificationItem = document.querySelector(`[data-notification-id="${notificationId}"]`);
+            if (notificationItem) {
+                notificationItem.classList.remove('unread');
+                notificationItem.querySelector('.mark-read-btn')?.remove();
+            }
+            updateNotificationBadge();
+            showNotification('تم تعليم الإشعار كمقروء', 'success');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('فشل في تحديث الإشعار', 'error');
+    });
+}
+
+function markAllNotificationsRead() {
+    fetch('/notifications/mark-all-read', {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // تحديث جميع الإشعارات
+            document.querySelectorAll('.notification-item.unread').forEach(item => {
+                item.classList.remove('unread');
+                item.querySelector('.mark-read-btn')?.remove();
+            });
+            updateNotificationBadge();
+            showNotification('تم تعليم جميع الإشعارات كمقروءة', 'success');
+        }
+    });
+}
+
+function updateNotificationBadge() {
+    const badge = document.querySelector('.notification-badge');
+    const unreadCount = document.querySelectorAll('.notification-item.unread').length;
+
+    if (unreadCount > 0) {
+        badge.textContent = unreadCount;
+        badge.style.display = 'block';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+function showNotification(message, type = 'info') {
+    // دالة بسيطة لعرض الإشعارات
+    console.log(`${type}: ${message}`);
+}
+
+// تحديث الإشعارات تلقائياً
+function refreshNotifications() {
+    fetch('/api/notifications/recent')
+        .then(response => response.json())
+        .then(data => {
+            updateNotificationBadge();
+        });
+}
+
+// تحديث كل دقيقة
+setInterval(refreshNotifications, 60000);
+</script>
+
+<!-- باقي محتوى الداشبورد يتبع هنا -->
+<!-- ... -->
 
     <!-- ===================== فلتر الشركات ===================== -->
     {% if current_user.role == 'admin' and companies_list %}
@@ -448,12 +1113,17 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 <!-- ===================== أيقونات الواجهات العليا مع تحسينات ===================== -->
 
+<!-- في قسم features في الداشبورد -->
 {% set features = [
     {'url':'companies', 'icon':'fa-building', 'text':'الشركات', 'bg':'bg-companies', 'badge': total_companies},
     {'url':'evaluations', 'icon':'fa-clipboard-check', 'text':'التقييمات', 'bg':'bg-evaluations', 'badge': total_evaluations},
     {'url':'users', 'icon':'fa-user', 'text':'المستخدمون', 'bg':'bg-users', 'badge': users|length},
     {'url':'authorities', 'icon':'fa-users', 'text':'الجهات', 'bg':'bg-authorities', 'badge': authorities|length},
     {'url':'locations', 'icon':'fa-map-marker-alt', 'text':'المناطق', 'bg':'bg-locations', 'badge': total_regions},
+
+    {'url':'audit_logs_list', 'icon':'fa-clipboard-list', 'text':'سجلات التدقيق', 'bg':'bg-audit', 'badge': total_audit_logs},
+    {'url':'notifications_list', 'icon':'fa-bell', 'text':'الإشعارات', 'bg':'bg-notifications', 'badge': unread_notifications_count},
+
     {'url':'criteria', 'icon':'fa-list-check', 'text':'المعايير', 'bg':'bg-criteria', 'badge': ''},
     {'url':'report_summary', 'icon':'fa-broom', 'text':'تقرير المناطق', 'bg':'bg-report-evaluation', 'badge': ''},
     {'url':'reports', 'icon':'fa-file-alt', 'text':'تقرير المستخدمين', 'bg':'bg-report-general', 'badge': ''},
@@ -461,7 +1131,6 @@ document.addEventListener('DOMContentLoaded', function() {
     {'url':'responsibility_report', 'icon':'fa-balance-scale', 'text':'تقرير الجهات', 'bg':'bg-report-responsibility', 'badge': ''},
     {'url':'select_user', 'icon':'fa-file-alt', 'text':'نماذج التقييم', 'bg':'bg-evaluations', 'badge': ''}
 ] %}
-
 <div class="features-grid">
     {% for item in features %}
     <a href="{{ url_for(item.url) }}" class="feature-card {{ item.bg }}" data-feature="{{ item.text }}">
@@ -1317,7 +1986,74 @@ setInterval(refreshCompanyData, 30000);
         </div>
     </div>
 </div>
+<!-- بعد قسم مؤشرات الأداء الذكية -->
+<div class="quick-stats-section">
+    <div class="row">
+        <!-- إحصائيات سجلات التدقيق -->
+        <div class="col-md-6">
+            <div class="stat-card audit-stats">
+                <div class="stat-header">
+                    <i class="fas fa-clipboard-list"></i>
+                    <h4>سجلات التدقيق</h4>
+                </div>
+                <div class="stat-body">
+                    <div class="stat-row">
+                        <span class="stat-label">إجمالي السجلات:</span>
+                        <span class="stat-value">{{ total_audit_logs }}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">سجلات اليوم:</span>
+                        <span class="stat-value">{{ today_audit_logs }}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">أكثر الإجراءات:</span>
+                        <span class="stat-value">{{ most_common_action }}</span>
+                    </div>
+                </div>
+                <div class="stat-footer">
+                    <a href="{{ url_for('audit_logs_list') }}" class="btn-stat-action">
+                        <i class="fas fa-external-link-alt"></i>
+                        عرض التفاصيل
+                    </a>
+                </div>
+            </div>
+        </div>
 
+        <!-- إحصائيات الإشعارات -->
+        <div class="col-md-6">
+            <div class="stat-card notification-stats">
+                <div class="stat-header">
+                    <i class="fas fa-bell"></i>
+                    <h4>الإشعارات</h4>
+                </div>
+                <div class="stat-body">
+                    <div class="stat-row">
+                        <span class="stat-label">غير المقروء:</span>
+                        <span class="stat-value badge-unread">{{ unread_notifications_count }}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">المقروء:</span>
+                        <span class="stat-value badge-read">{{ read_notifications_count }}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">الإجمالي:</span>
+                        <span class="stat-value">{{ total_notifications }}</span>
+                    </div>
+                </div>
+                <div class="stat-footer">
+                    <button class="btn-stat-action" onclick="markAllNotificationsRead()">
+                        <i class="fas fa-check-double"></i>
+                        تعليم الكل كمقروء
+                    </button>
+                    <a href="{{ url_for('notifications_list') }}" class="btn-stat-action">
+                        <i class="fas fa-list"></i>
+                        إدارة الإشعارات
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 <!-- ===================== المكونات الإضافية ===================== -->
 <!-- أيقونة المعلومات -->
 <div class="floating-buttons">
@@ -1412,16 +2148,7 @@ setInterval(refreshCompanyData, 30000);
     </div>
 </div>
 
-<!-- الإشعارات -->
-<div id="notificationCenter" class="notification-center">
-    <div class="notification-header">
-        <h4>الإشعارات</h4>
-        <button class="btn-clear" onclick="clearNotifications()">مسح الكل</button>
-    </div>
-    <div class="notification-list" id="notificationList">
-        <!-- سيتم إضافة الإشعارات ديناميكياً -->
-    </div>
-</div>
+
 
 <style>
 /* ===================== الأنماط المحسنة ===================== */
@@ -2392,6 +3119,341 @@ setInterval(refreshCompanyData, 30000);
         padding: 0.5rem;
     }
 }
+
+    /* أنماط عناصر القوائم الجديدة */
+.bg-audit .feature-icon {
+    background: linear-gradient(135deg, #8B4513, #A0522D);
+}
+.bg-notifications .feature-icon {
+    background: linear-gradient(135deg, #FF6B6B, #FF8E53);
+}
+
+/* أنماط عناصر التحكم في الهيدر */
+.header-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    position: absolute;
+    left: 2rem;
+    top: 2rem;
+}
+
+.notification-widget {
+    position: relative;
+}
+
+.notification-icon {
+    position: relative;
+    width: 50px;
+    height: 50px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: var(--transition);
+    color: white;
+    font-size: 1.2rem;
+}
+
+.notification-icon:hover {
+    background: rgba(255,255,255,0.3);
+    transform: scale(1.1);
+}
+
+.notification-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #FF4757;
+    color: white;
+    border-radius: 10px;
+    padding: 2px 6px;
+    font-size: 0.7rem;
+    font-weight: bold;
+    min-width: 18px;
+    text-align: center;
+}
+
+.notification-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 350px;
+    background: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+    transition: var(--transition);
+    z-index: 1000;
+}
+
+.notification-widget:hover .notification-dropdown {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.notification-header {
+    padding: 1rem;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.notification-header h5 {
+    margin: 0;
+    color: var(--dark);
+}
+
+.view-all {
+    color: var(--primary);
+    text-decoration: none;
+    font-size: 0.9rem;
+}
+
+.notification-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.notification-item {
+    padding: 1rem;
+    border-bottom: 1px solid #f1f3f4;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    transition: var(--transition);
+}
+
+.notification-item.unread {
+    background: #f8f9fa;
+}
+
+.notification-item:last-child {
+    border-bottom: none;
+}
+
+.notification-item:hover {
+    background: #f1f3f4;
+}
+
+.notification-content {
+    flex: 1;
+}
+
+.notification-content h6 {
+    margin: 0 0 0.25rem 0;
+    color: var(--dark);
+    font-size: 0.9rem;
+}
+
+.notification-content p {
+    margin: 0 0 0.5rem 0;
+    color: #64748B;
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
+.notification-content small {
+    color: #94a3b8;
+    font-size: 0.7rem;
+}
+
+.mark-read-btn {
+    background: none;
+    border: none;
+    color: var(--success);
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 4px;
+    transition: var(--transition);
+}
+
+.mark-read-btn:hover {
+    background: var(--success);
+    color: white;
+}
+
+.empty-notifications {
+    padding: 2rem 1rem;
+    text-align: center;
+    color: #94a3b8;
+}
+
+.empty-notifications i {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    opacity: 0.5;
+}
+
+.quick-audit-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(255,255,255,0.2);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 25px;
+    text-decoration: none;
+    transition: var(--transition);
+    font-size: 0.9rem;
+}
+
+.quick-audit-btn:hover {
+    background: rgba(255,255,255,0.3);
+    color: white;
+    transform: translateY(-2px);
+}
+
+/* أنماط بطاقات الإحصائيات السريعة */
+.quick-stats-section {
+    margin: 2rem 0;
+}
+
+.stat-card {
+    background: white;
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+    height: 100%;
+    transition: var(--transition);
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 30px rgba(0,0,0,0.15);
+}
+
+.stat-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #f1f3f4;
+}
+
+.stat-header i {
+    width: 50px;
+    height: 50px;
+    background: var(--primary);
+    color: white;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+}
+
+.audit-stats .stat-header i {
+    background: linear-gradient(135deg, #8B4513, #A0522D);
+}
+
+.notification-stats .stat-header i {
+    background: linear-gradient(135deg, #FF6B6B, #FF8E53);
+}
+
+.stat-header h4 {
+    margin: 0;
+    color: var(--dark);
+    font-size: 1.3rem;
+}
+
+.stat-body {
+    margin-bottom: 1.5rem;
+}
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #f8f9fa;
+}
+
+.stat-row:last-child {
+    border-bottom: none;
+}
+
+.stat-label {
+    color: #64748B;
+    font-weight: 500;
+}
+
+.stat-value {
+    font-weight: 700;
+    color: var(--dark);
+}
+
+.badge-unread {
+    background: #FF4757;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+}
+
+.badge-read {
+    background: var(--success);
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+}
+
+.stat-footer {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.btn-stat-action {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    text-decoration: none;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: var(--transition);
+    cursor: pointer;
+}
+
+.btn-stat-action:hover {
+    background: var(--primary-dark);
+    color: white;
+    transform: translateY(-2px);
+}
+
+/* تجاوبية */
+@media (max-width: 768px) {
+    .header-controls {
+        position: static;
+        justify-content: center;
+        margin-top: 1rem;
+    }
+
+    .notification-dropdown {
+        width: 300px;
+        left: -125px;
+    }
+
+    .stat-footer {
+        flex-direction: column;
+    }
+
+    .btn-stat-action {
+        justify-content: center;
+    }
+}
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -2904,5 +3966,76 @@ function renderTimeCharts() {
 
 // تشغيل الرسوم البيانية عند تحميل الصفحة
 document.addEventListener('DOMContentLoaded', renderTimeCharts);
+
+// دوال الإشعارات
+function markNotificationRead(notificationId) {
+    fetch(`/notifications/${notificationId}/mark-read`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // تحديث الواجهة
+            const notificationItem = document.querySelector(`[data-notification-id="${notificationId}"]`);
+            if (notificationItem) {
+                notificationItem.classList.remove('unread');
+                notificationItem.querySelector('.mark-read-btn')?.remove();
+            }
+            updateNotificationBadge();
+            showNotification('تم تعليم الإشعار كمقروء', 'success');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('فشل في تحديث الإشعار', 'error');
+    });
+}
+
+function markAllNotificationsRead() {
+    fetch('/notifications/mark-all-read', {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // تحديث جميع الإشعارات
+            document.querySelectorAll('.notification-item.unread').forEach(item => {
+                item.classList.remove('unread');
+                item.querySelector('.mark-read-btn')?.remove();
+            });
+            updateNotificationBadge();
+            showNotification('تم تعليم جميع الإشعارات كمقروءة', 'success');
+        }
+    });
+}
+
+function updateNotificationBadge() {
+    const badge = document.querySelector('.notification-badge');
+    const unreadCount = document.querySelectorAll('.notification-item.unread').length;
+
+    if (unreadCount > 0) {
+        badge.textContent = unreadCount;
+        badge.style.display = 'block';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+// تحديث الإشعارات تلقائياً
+function refreshNotifications() {
+    fetch('/api/notifications/recent')
+        .then(response => response.json())
+        .then(data => {
+            // تحديث قائمة الإشعارات
+            updateNotificationList(data.notifications);
+            updateNotificationBadge();
+        });
+}
+
+// تحديث كل دقيقة
+setInterval(refreshNotifications, 60000);
 </script>
 {% endblock %}
