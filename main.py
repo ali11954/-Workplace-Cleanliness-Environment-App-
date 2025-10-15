@@ -9,6 +9,8 @@ from wtforms.validators import DataRequired, Length, EqualTo, NumberRange, Optio
 from datetime import datetime
 from functools import wraps
 import os
+from datetime import datetime, timezone
+datetime.now(timezone.utc)
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from sqlalchemy import func, distinct
@@ -25,6 +27,10 @@ app.config.from_object(Config)
 
 # تهيئة قاعدة البيانات
 db.init_app(app)
+
+from flask_migrate import Migrate
+from models import db  # تأكد من استيراد db
+migrate = Migrate(app, db)
 
 # ====== 5️⃣ إعداد Flask-Login ======
 # ====== 5️⃣ إعداد Flask-Login ======
@@ -4193,6 +4199,39 @@ def health_check():
     })
 
 
+def check_database_status():
+    """فحص حالة قاعدة البيانات"""
+    with app.app_context():
+        try:
+            from models import User, Company
+
+            print("🔍 فحص قاعدة البيانات...")
+
+            # تحقق من الجداول
+            from sqlalchemy import inspect
+            inspector = inspect(db.engine)
+            tables = inspector.get_table_names()
+            print(f"📋 الجداول الموجودة: {tables}")
+
+            # تحقق من البيانات
+            user_count = User.query.count()
+            company_count = Company.query.count()
+
+            print(f"👥 عدد المستخدمين: {user_count}")
+            print(f"🏢 عدد الشركات: {company_count}")
+
+            if user_count > 0:
+                users = User.query.all()
+                for user in users:
+                    print(f"   👤 {user.username} - {user.fullname} - {user.role}")
+
+            return True
+
+        except Exception as e:
+            print(f"❌ خطأ في فحص قاعدة البيانات: {e}")
+            return False
+
+
 def initialize_database():
     """تهيئة قاعدة البيانات وإنشاء البيانات الافتراضية"""
     with app.app_context():
@@ -4213,11 +4252,14 @@ def initialize_database():
                 )
                 db.session.add(yemen_sugar_company)
                 db.session.flush()
+                print("✅ تم إنشاء الشركة اليمنية لتكرير السكر")
 
             # إنشاء المستخدم الافتراضي
-            if not User.query.filter_by(username='admin').first():
+            admin_user = User.query.filter_by(username='admin').first()
+            if not admin_user:
                 admin = User(
-                   username='admin',
+                    fullname='المدير العام',  # مهم!
+                    username='admin',
                     email='admin@system.com',
                     role='admin',
                     company_id=yemen_sugar_company.id,
@@ -4226,9 +4268,10 @@ def initialize_database():
                 )
                 admin.set_password('123456')
                 db.session.add(admin)
+                print("✅ تم إنشاء المستخدم admin")
 
             db.session.commit()
-            print("✅ تم إنشاء البيانات الافتراضية بنجاح")
+            print("🎉 تم إنشاء البيانات الافتراضية بنجاح")
 
         except Exception as e:
             db.session.rollback()
@@ -4237,10 +4280,7 @@ def initialize_database():
 
 if __name__ == "__main__":
     with app.app_context():
-        db.create_all()
-        print("تم إنشاء الجداول بنجاح")
-        print("تم الاتصال بقاعدة البيانات بنجاح")
+        initialize_database()  # هذه السطر الأساسي!
 
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=5000, debug=True)
-
+    app.run(host="0.0.0.0", port=port, debug=True)
