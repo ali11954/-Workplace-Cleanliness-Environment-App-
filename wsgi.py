@@ -194,6 +194,198 @@ with app.app_context():
         import traceback
 
         traceback.print_exc()
+import sqlite3
+from sqlalchemy import text
+
+
+def copy_data_from_local_db():
+    """نسخ البيانات من قاعدة البيانات المحلية SQLite إلى PostgreSQL على Render"""
+    with app.app_context():
+        try:
+            print("🔄 بدء نسخ البيانات من قاعدة البيانات المحلية...")
+
+            # مسار قاعدة البيانات المحلية
+            local_db_path = r'D:\ghith\NEW\hoesing\DullUselessIntegrationtesting\DullUselessIntegrationtesting\instance\database.db'
+
+            if not os.path.exists(local_db_path):
+                print("❌ قاعدة البيانات المحلية غير موجودة في المسار المحدد")
+                return
+
+            # الاتصال بقاعدة البيانات المحلية
+            local_conn = sqlite3.connect(local_db_path)
+            local_conn.row_factory = sqlite3.Row  # للحصول على النتائج كـ dict
+            local_cursor = local_conn.cursor()
+
+            # 1. نسخ الشركات
+            print("🏢 نسخ بيانات الشركات...")
+            local_cursor.execute("SELECT * FROM companies")
+            companies = local_cursor.fetchall()
+
+            for company in companies:
+                existing_company = Company.query.filter_by(name=company['name']).first()
+                if not existing_company:
+                    new_company = Company(
+                        name=company['name'],
+                        code=company.get('code', ''),
+                        description=company.get('description', ''),
+                        address=company.get('address', ''),
+                        phone=company.get('phone', ''),
+                        email=company.get('email', ''),
+                        active=bool(company.get('active', True))
+                    )
+                    db.session.add(new_company)
+
+            db.session.commit()
+            print(f"✅ تم نسخ {len(companies)} شركة")
+
+            # 2. نسخ المستخدمين
+            print("👥 نسخ بيانات المستخدمين...")
+            local_cursor.execute("SELECT * FROM user")
+            users = local_cursor.fetchall()
+
+            for user in users:
+                existing_user = User.query.filter_by(username=user['username']).first()
+                if not existing_user:
+                    # البحث عن الشركة المناسبة
+                    company = Company.query.filter_by(name=user.get('company', '')).first()
+                    if not company:
+                        company = Company.query.first()  # استخدام أول شركة
+
+                    new_user = User(
+                        fullname=user.get('fullname', ''),
+                        username=user['username'],
+                        email=user.get('email', ''),
+                        role=user.get('role', 'user'),
+                        company_id=company.id if company else None,
+                        active=bool(user.get('active', True)),
+                        is_admin=bool(user.get('is_admin', False))
+                    )
+                    new_user.set_password('123456')  # كلمة مرور افتراضية
+                    db.session.add(new_user)
+
+            db.session.commit()
+            print(f"✅ تم نسخ {len(users)} مستخدم")
+
+            # 3. نسخ المناطق
+            print("📍 نسخ بيانات المناطق...")
+            local_cursor.execute("SELECT * FROM location")
+            locations = local_cursor.fetchall()
+
+            for location in locations:
+                existing_location = Location.query.filter_by(name=location['name']).first()
+                if not existing_location:
+                    # البحث عن الشركة
+                    company = Company.query.filter_by(name=location.get('company', '')).first()
+                    if not company:
+                        company = Company.query.first()
+
+                    new_location = Location(
+                        name=location['name'],
+                        company_id=company.id if company else None,
+                        code=location.get('code', ''),
+                        is_active=bool(location.get('is_active', True))
+                    )
+                    db.session.add(new_location)
+
+            db.session.commit()
+            print(f"✅ تم نسخ {len(locations)} منطقة")
+
+            # 4. نسخ المواقع
+            print("🏗️ نسخ بيانات المواقع...")
+            local_cursor.execute("SELECT * FROM site")
+            sites = local_cursor.fetchall()
+
+            for site in sites:
+                existing_site = Site.query.filter_by(name=site['name']).first()
+                if not existing_site:
+                    # البحث عن المنطقة
+                    region = Location.query.filter_by(name=site.get('region', '')).first()
+                    if region:
+                        new_site = Site(
+                            name=site['name'],
+                            region_id=region.id
+                        )
+                        db.session.add(new_site)
+
+            db.session.commit()
+            print(f"✅ تم نسخ {len(sites)} موقع")
+
+            # 5. نسخ الأماكن
+            print("🏠 نسخ بيانات الأماكن...")
+            local_cursor.execute("SELECT * FROM place")
+            places = local_cursor.fetchall()
+
+            for place in places:
+                existing_place = Place.query.filter_by(name=place['name']).first()
+                if not existing_place:
+                    # البحث عن الموقع
+                    site = Site.query.filter_by(name=place.get('site', '')).first()
+                    if site:
+                        new_place = Place(
+                            name=place['name'],
+                            site_id=site.id
+                        )
+                        db.session.add(new_place)
+
+            db.session.commit()
+            print(f"✅ تم نسخ {len(places)} مكان")
+
+            # 6. نسخ جهات التقييم
+            print("🏛️ نسخ بيانات جهات التقييم...")
+            local_cursor.execute("SELECT * FROM evaluation_authorities")
+            authorities = local_cursor.fetchall()
+
+            for authority in authorities:
+                existing_auth = EvaluationAuthority.query.filter_by(name=authority['name']).first()
+                if not existing_auth:
+                    # البحث عن الشركة
+                    company = Company.query.filter_by(name=authority.get('company', '')).first()
+                    if not company:
+                        company = Company.query.first()
+
+                    new_auth = EvaluationAuthority(
+                        name=authority['name'],
+                        company_id=company.id if company else None
+                    )
+                    db.session.add(new_auth)
+
+            db.session.commit()
+            print(f"✅ تم نسخ {len(authorities)} جهة تقييم")
+
+            # 7. نسخ المعايير
+            print("📊 نسخ بيانات المعايير...")
+            local_cursor.execute("SELECT * FROM criterion")
+            criteria = local_cursor.fetchall()
+
+            for criterion in criteria:
+                existing_criterion = Criterion.query.filter_by(name=criterion['name']).first()
+                if not existing_criterion:
+                    # البحث عن المكان
+                    place = Place.query.filter_by(name=criterion.get('place', '')).first()
+                    # البحث عن جهة التقييم
+                    authority = EvaluationAuthority.query.filter_by(name=criterion.get('authority', '')).first()
+
+                    if place and authority:
+                        new_criterion = Criterion(
+                            name=criterion['name'],
+                            min_score=float(criterion.get('min_score', 1)),
+                            max_score=float(criterion.get('max_score', 10)),
+                            place_id=place.id,
+                            authority_id=authority.id
+                        )
+                        db.session.add(new_criterion)
+
+            db.session.commit()
+            print(f"✅ تم نسخ {len(criteria)} معيار")
+
+            local_conn.close()
+            print("🎉 اكتمل نسخ جميع البيانات من قاعدة البيانات المحلية!")
+
+        except Exception as e:
+            db.session.rollback()
+            print(f"❌ خطأ في نسخ البيانات: {e}")
+            import traceback
+            traceback.print_exc()
 
 application = app
 
