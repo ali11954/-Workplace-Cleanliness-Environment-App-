@@ -11,55 +11,48 @@ with app.app_context():
     print("🚀 بدء تهيئة قاعدة البيانات...")
 
     try:
-        # إنشاء الجداول
+        # 1. إضافة العمود أولاً (سيتم تجاهله إذا كان موجوداً)
+        with db.engine.connect() as conn:
+            conn.execute(db.text("ALTER TABLE companies ADD COLUMN IF NOT EXISTS code VARCHAR(50)"))
+            conn.commit()
+        print("✅ تم التأكد من وجود عمود code")
+
+        # 2. إنشاء الجداول
         print("🔧 جاري إنشاء الجداول...")
         db.create_all()
         print("✅ تم إنشاء الجداول بنجاح")
 
-        # التحقق من وجود المستخدم الافتراضي
+        # 3. التحقق من البيانات
         user_count = db.session.query(User).count()
-        company_count = db.session.query(Company).count()
-
-        print(f"📊 البيانات الحالية: {user_count} مستخدم، {company_count} شركة")
+        print(f"📊 عدد المستخدمين: {user_count}")
 
         if user_count == 0:
-            print("🆕 إنشاء البيانات الافتراضية...")
+            print("🆕 إنشاء المستخدم الافتراضي...")
 
             # إنشاء شركة افتراضية
-            default_company = Company(
-                name="الشركة اليمنية لتكرير السكر",
-                code="YSRC001"
-            )
-            db.session.add(default_company)
+            company = Company(name="الشركة اليمنية لتكرير السكر", code="YSRC001")
+            db.session.add(company)
             db.session.commit()
 
             # إنشاء مستخدم افتراضي
             from werkzeug.security import generate_password_hash
 
-            default_user = User(
-                fullname="المسؤول العام",
+            user = User(
                 username="owner",
-                email="owner@company.com",
                 password_hash=generate_password_hash("123456"),
                 is_admin=True,
                 role="admin",
-                company_id=default_company.id
+                company_id=company.id
             )
-            db.session.add(default_user)
+            db.session.add(user)
             db.session.commit()
-
-            print("✅ تم إنشاء البيانات الافتراضية:")
-            print("   👤 مستخدم: owner / 123456")
-            print("   🏢 شركة: الشركة اليمنية لتكرير السكر")
-        else:
-            print("✅ توجد بيانات بالفعل")
+            print("✅ تم إنشاء: owner / 123456")
 
     except Exception as e:
-        print(f"⚠️ خطأ أثناء التهيئة: {e}")
+        print(f"⚠️ خطأ: {e}")
 
-    print("✅ تم تهيئة التطبيق بنجاح")
+    print("✅ تم التهيئة")
 
-# هذا هو المتغير الذي يبحث عنه Gunicorn
 application = app
 
 if __name__ == "__main__":
