@@ -11,7 +11,7 @@ pytz==2025.2
 python-dotenv==1.1.1
 requests==2.32.4
 pandas==2.3.1
-openpyxl==3.2.0b1
+openpyxl==3.1.2
 psycopg2-binary==2.9.10
 Flask-Migrate==4.0.7
 reportlab==4.0.7

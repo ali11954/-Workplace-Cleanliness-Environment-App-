@@ -196,13 +196,18 @@ from models import Company  # تأكد من استيراد نموذج Company
 class LoginForm(FlaskForm):
     username = StringField('اسم المستخدم', validators=[DataRequired()])
     password = PasswordField('كلمة المرور', validators=[DataRequired()])
-    company = SelectField('الشركة', coerce=int)  # ✅ أضف الحقل ولكن بدون validators
+    company = SelectField('الشركة', coerce=int, validators=[Optional()])  # ✅ Optional بدلاً من DataRequired
     submit = SubmitField('تسجيل الدخول')
 
     def __init__(self, *args, **kwargs):
         super(LoginForm, self).__init__(*args, **kwargs)
-        # ✅ استخدم قائمة فارغة بدلاً من تحميل الشركات
-        self.company.choices = [(0, '-- اختر الشركة --')]
+        # ✅ جلب الشركات الفعلية
+        try:
+            companies = Company.query.filter_by(active=True).order_by(Company.name).all()
+            self.company.choices = [(0, '-- اختر الشركة --')] + [(c.id, c.name) for c in companies]
+        except Exception as e:
+            print(f"⚠️ خطأ في تحميل الشركات: {e}")
+            self.company.choices = [(0, '-- لا توجد شركات --')]
 
 from wtforms import SelectMultipleField
 class UserForm(FlaskForm):
@@ -1235,11 +1240,16 @@ def login():
     form = LoginForm()
 
     if form.validate_on_submit():
-        # ✅ ابحث عن المستخدم بدون شركة
+        # ✅ ابحث عن المستخدم بدون شركة أولاً
         user = User.query.filter_by(username=form.username.data).first()
 
         if user and user.check_password(form.password.data):
             if user.active:
+                # ✅ للمستخدمين العاديين: تحقق من وجود شركة
+                if user.role != 'admin' and user.company_id is None:
+                    flash('المستخدم غير مرتبط بأي شركة', 'danger')
+                    return render_template('admin/login.html', form=form)
+
                 login_user(user)
                 flash('تم تسجيل الدخول بنجاح', 'success')
 
@@ -4224,7 +4234,8 @@ def check_database_status():
             if user_count > 0:
                 users = User.query.all()
                 for user in users:
-                    print(f"   👤 {user.username} - {user.fullname} - {user.role}")
+                    print(
+                        f"   👤 {user.username} - {user.fullname} - {user.role} - company_id: {user.company_id}")  # ✅ أضفت company_id
 
             return True
 
@@ -4255,21 +4266,28 @@ def initialize_database():
                 db.session.flush()
                 print("✅ تم إنشاء الشركة اليمنية لتكرير السكر")
 
-            # إنشاء المستخدم الافتراضي
+            # ✅ الكود الجديد المضاف - تحديث المستخدم admin إذا كان موجوداً
             admin_user = User.query.filter_by(username='admin').first()
-            if not admin_user:
+            if admin_user:
+                if admin_user.company_id is None:
+                    admin_user.company_id = yemen_sugar_company.id
+                    print("✅ تم ربط المستخدم admin بالشركة اليمنية لتكرير السكر")
+                else:
+                    print(f"ℹ️ المستخدم admin مرتبط مسبقاً بشركة ID: {admin_user.company_id}")
+            else:
+                # إنشاء المستخدم الافتراضي إذا لم يكن موجوداً
                 admin = User(
-                    fullname='المدير العام',  # مهم!
+                    fullname='المدير العام',
                     username='admin',
                     email='admin@system.com',
                     role='admin',
-                    company_id=yemen_sugar_company.id,
+                    company_id=yemen_sugar_company.id,  # ✅ مرتبط بالشركة
                     active=True,
                     is_admin=True
                 )
                 admin.set_password('123456')
                 db.session.add(admin)
-                print("✅ تم إنشاء المستخدم admin")
+                print("✅ تم إنشاء المستخدم admin وربطه بالشركة")
 
             db.session.commit()
             print("🎉 تم إنشاء البيانات الافتراضية بنجاح")
@@ -4277,11 +4295,16 @@ def initialize_database():
         except Exception as e:
             db.session.rollback()
             print(f"❌ خطأ في تهيئة قاعدة البيانات: {e}")
+            import traceback
+            traceback.print_exc()  # ✅ لرؤية التفاصيل الكاملة للخطأ
 
 
 if __name__ == "__main__":
-    with app.app_context():
-        initialize_database()  # هذه السطر الأساسي!
+    # ✅ أولاً: فحص حالة قاعدة البيانات
+    check_database_status()
+
+    # ✅ ثانياً: تهيئة قاعدة البيانات
+    initialize_database()
 
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
