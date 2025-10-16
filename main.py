@@ -192,16 +192,14 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SelectField, SubmitField
 from wtforms.validators import DataRequired
 from models import Company  # تأكد من استيراد نموذج Company
-
 class LoginForm(FlaskForm):
     username = StringField('اسم المستخدم', validators=[DataRequired()])
     password = PasswordField('كلمة المرور', validators=[DataRequired()])
-    company = SelectField('الشركة', coerce=int, validators=[Optional()])  # ✅ Optional بدلاً من DataRequired
+    company = SelectField('الشركة', coerce=int, validators=[Optional()])
     submit = SubmitField('تسجيل الدخول')
 
     def __init__(self, *args, **kwargs):
         super(LoginForm, self).__init__(*args, **kwargs)
-        # ✅ جلب الشركات الفعلية
         try:
             companies = Company.query.filter_by(active=True).order_by(Company.name).all()
             self.company.choices = [(0, '-- اختر الشركة --')] + [(c.id, c.name) for c in companies]
@@ -1240,17 +1238,42 @@ def login():
     form = LoginForm()
 
     if form.validate_on_submit():
-        # ✅ ابحث عن المستخدم بدون شركة أولاً
+        # 🔍 تشخيص: طباعة بيانات المحاولة
+        print(f"🔐 محاولة تسجيل دخول:")
+        print(f"   👤 username: {form.username.data}")
+        print(f"   🏢 company: {form.company.data}")
+
+        # ابحث عن المستخدم
         user = User.query.filter_by(username=form.username.data).first()
+
+        if user:
+            print(f"   ✅ وجد المستخدم: {user.username}")
+            print(f"   🔍 تحقق كلمة المرور: {user.check_password(form.password.data)}")
+            print(f"   🎭 الدور: {user.role}")
+            print(f"   🏢 company_id: {user.company_id}")
+            print(f"   ✅ نشط: {user.active}")
 
         if user and user.check_password(form.password.data):
             if user.active:
-                # ✅ للمستخدمين العاديين: تحقق من وجود شركة
-                if user.role != 'admin' and user.company_id is None:
-                    flash('المستخدم غير مرتبط بأي شركة', 'danger')
-                    return render_template('admin/login.html', form=form)
+                # ✅ التحقق من الشركة
+                if user.role == 'admin':
+                    # المسؤول يمكنه تسجيل الدخول بدون شركة أو بأي شركة
+                    print("   👑 مسؤول - تخطي التحقق من الشركة")
+                elif user.role in ['supervisor', 'sub_admin', 'user']:
+                    if form.company.data == 0:
+                        print("   ❌ يجب اختيار الشركة للمستخدم العادي")
+                        flash('يجب اختيار الشركة', 'danger')
+                        return render_template('admin/login.html', form=form)
+                    elif user.company_id != form.company.data:
+                        print(f"   ❌ شركة المستخدم لا تطابق المختارة")
+                        flash('الشركة المحددة لا تطابق شركة المستخدم', 'danger')
+                        return render_template('admin/login.html', form=form)
+                    else:
+                        print("   ✅ تطابق الشركة - متابعة التسجيل")
 
+                # ✅ تسجيل الدخول الناجح
                 login_user(user)
+                print(f"   ✅ تم تسجيل الدخول بنجاح للمستخدم: {user.username}")
                 flash('تم تسجيل الدخول بنجاح', 'success')
 
                 # توجيه حسب الدور
@@ -1261,8 +1284,10 @@ def login():
                 else:
                     return redirect(url_for('user_dashboard'))
             else:
+                print("   ❌ الحساب غير نشط")
                 flash('الحساب غير نشط', 'danger')
         else:
+            print("   ❌ اسم المستخدم أو كلمة المرور غير صحيحة")
             flash('اسم المستخدم أو كلمة المرور غير صحيحة', 'danger')
 
     return render_template('admin/login.html', form=form)
