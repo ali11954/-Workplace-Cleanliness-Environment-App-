@@ -4259,8 +4259,7 @@ def check_database_status():
             if user_count > 0:
                 users = User.query.all()
                 for user in users:
-                    print(
-                        f"   👤 {user.username} - {user.fullname} - {user.role} - company_id: {user.company_id}")  # ✅ أضفت company_id
+                    print(f"   👤 {user.username} - {user.fullname} - {user.role} - company_id: {user.company_id}")
 
             return True
 
@@ -4269,15 +4268,78 @@ def check_database_status():
             return False
 
 
+def create_emergency_user():
+    """إنشاء مستخدم طوارئ إذا لم يكن هناك مستخدمين"""
+    with app.app_context():
+        try:
+            user_count = User.query.count()
+            company_count = Company.query.count()
+
+            print(f"🚨 فحص الطوارئ: {user_count} مستخدم, {company_count} شركة")
+
+            if user_count == 0:
+                print("🚨 لا يوجد مستخدمين - إنشاء مستخدم طوارئ...")
+
+                # التحقق من وجود شركة
+                emergency_company = Company.query.filter_by(name='شركة الطوارئ').first()
+                if not emergency_company:
+                    emergency_company = Company(
+                        name='شركة الطوارئ',
+                        code='EMERGENCY',
+                        active=True
+                    )
+                    db.session.add(emergency_company)
+                    db.session.flush()
+                    print("✅ تم إنشاء شركة الطوارئ")
+
+                # إنشاء مستخدم طوارئ
+                emergency_user = User(
+                    fullname='مدير الطوارئ',
+                    username='emergency',
+                    email='emergency@system.com',
+                    role='admin',
+                    company_id=emergency_company.id,
+                    active=True,
+                    is_admin=True
+                )
+                emergency_user.set_password('123456')
+                db.session.add(emergency_user)
+
+                db.session.commit()
+                print("✅ تم إنشاء مستخدم الطوارئ:")
+                print("   👤 username: emergency")
+                print("   🔑 password: 123456")
+                print("   🏢 company: شركة الطوارئ")
+            else:
+                print(f"✅ يوجد {user_count} مستخدم في النظام - لا حاجة للطوارئ")
+
+        except Exception as e:
+            db.session.rollback()
+            print(f"❌ خطأ في إنشاء مستخدم الطوارئ: {e}")
+            import traceback
+            traceback.print_exc()
+
+
 def initialize_database():
     """تهيئة قاعدة البيانات وإنشاء البيانات الافتراضية"""
     with app.app_context():
         try:
-            db.create_all()
+            print("🔄 بدء تهيئة قاعدة البيانات الشاملة...")
 
-            # إنشاء الشركة اليمنية لتكرير السكر
+            # إنشاء جميع الجداول
+            db.create_all()
+            print("✅ تم إنشاء الجداول الأساسية")
+
+            # 🔍 فحص الشركات الحالية
+            existing_companies = Company.query.all()
+            print(f"🔍 عدد الشركات الحالية: {len(existing_companies)}")
+            for company in existing_companies:
+                print(f"   🏢 {company.id}: {company.name} - active: {company.active}")
+
+            # إنشاء الشركة اليمنية لتكرير السكر إذا لم تكن موجودة
             yemen_sugar_company = Company.query.filter_by(name='الشركة اليمنية لتكرير السكر').first()
             if not yemen_sugar_company:
+                print("🆕 إنشاء الشركة اليمنية لتكرير السكر...")
                 yemen_sugar_company = Company(
                     name='الشركة اليمنية لتكرير السكر',
                     code='YSRC',
@@ -4289,30 +4351,38 @@ def initialize_database():
                 )
                 db.session.add(yemen_sugar_company)
                 db.session.flush()
-                print("✅ تم إنشاء الشركة اليمنية لتكرير السكر")
-
-            # ✅ الكود الجديد المضاف - تحديث المستخدم admin إذا كان موجوداً
-            admin_user = User.query.filter_by(username='admin').first()
-            if admin_user:
-                if admin_user.company_id is None:
-                    admin_user.company_id = yemen_sugar_company.id
-                    print("✅ تم ربط المستخدم admin بالشركة اليمنية لتكرير السكر")
-                else:
-                    print(f"ℹ️ المستخدم admin مرتبط مسبقاً بشركة ID: {admin_user.company_id}")
+                print(f"✅ تم إنشاء الشركة اليمنية لتكرير السكر - ID: {yemen_sugar_company.id}")
             else:
-                # إنشاء المستخدم الافتراضي إذا لم يكن موجوداً
-                admin = User(
+                print(f"✅ الشركة موجودة مسبقاً - ID: {yemen_sugar_company.id}")
+
+            # 🔍 فحص المستخدمين الحاليين
+            existing_users = User.query.all()
+            print(f"🔍 عدد المستخدمين الحاليين: {len(existing_users)}")
+            for user in existing_users:
+                print(f"   👤 {user.id}: {user.username} - {user.role} - company: {user.company_id}")
+
+            # إنشاء/تحديث المستخدم admin
+            admin_user = User.query.filter_by(username='admin').first()
+            if not admin_user:
+                print("🆕 إنشاء المستخدم admin...")
+                admin_user = User(
                     fullname='المدير العام',
                     username='admin',
                     email='admin@system.com',
                     role='admin',
-                    company_id=yemen_sugar_company.id,  # ✅ مرتبط بالشركة
+                    company_id=yemen_sugar_company.id,
                     active=True,
                     is_admin=True
                 )
-                admin.set_password('123456')
-                db.session.add(admin)
-                print("✅ تم إنشاء المستخدم admin وربطه بالشركة")
+                admin_user.set_password('123456')
+                db.session.add(admin_user)
+                print("✅ تم إنشاء المستخدم admin")
+            else:
+                print(f"✅ المستخدم admin موجود مسبقاً - company_id: {admin_user.company_id}")
+                # إذا كان admin موجوداً بدون شركة، اربطه بالشركة
+                if admin_user.company_id is None:
+                    admin_user.company_id = yemen_sugar_company.id
+                    print("✅ تم ربط المستخدم admin بالشركة")
 
             db.session.commit()
             print("🎉 تم إنشاء البيانات الافتراضية بنجاح")
@@ -4321,14 +4391,17 @@ def initialize_database():
             db.session.rollback()
             print(f"❌ خطأ في تهيئة قاعدة البيانات: {e}")
             import traceback
-            traceback.print_exc()  # ✅ لرؤية التفاصيل الكاملة للخطأ
+            traceback.print_exc()
 
 
 if __name__ == "__main__":
     # ✅ أولاً: فحص حالة قاعدة البيانات
     check_database_status()
 
-    # ✅ ثانياً: تهيئة قاعدة البيانات
+    # ✅ ثانياً: إنشاء مستخدم طوارئ إذا لزم الأمر
+    create_emergency_user()
+
+    # ✅ ثالثاً: تهيئة قاعدة البيانات
     initialize_database()
 
     port = int(os.environ.get("PORT", 5000))
