@@ -4,88 +4,625 @@
 
 {% block content %}
 <div class="main-container">
+    <!-- الهيدر المحسّن -->
     <div class="dashboard-header mb-4">
         <div class="header-content">
             <div class="app-title-section">
-                <h2 class="text-primary fw-bold">لوحة تحكم مدير الشؤون</h2>
-                <p class="text-muted">إدارة العمليات والتقييمات اليومية</p>
+                <h1 class="text-primary fw-bold mb-2">
+                    <i class="fas fa-user-tie me-2"></i>
+                    لوحة تحكم مدير الشؤون
+                </h1>
+                <p class="text-muted fs-6">
+                    <i class="fas fa-chart-line me-1"></i>
+                    إدارة العمليات والتقييمات اليومية - {{ company.name if company else "الشركة" }}
+                </p>
             </div>
             <div class="user-company-section">
-                <div class="company-badge" style="background: linear-gradient(45deg, #007bff, #0056b3);">
-                    <i class="fas fa-user-tie me-2"></i>
-                    <span class="company-name">مدير الشؤون</span>
+                <div class="user-badge">
+                    <div class="badge-content">
+                        <div class="user-avatar">
+                            <i class="fas fa-user-shield"></i>
+                        </div>
+                        <div class="user-info">
+                            <span class="user-name">{{ current_user.fullname or current_user.username }}</span>
+                            <span class="user-role">مدير الشؤون</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- بطاقات الإحصائيات السريعة -->
+    <div class="row g-3 mb-4">
+        <div class="col-xl-3 col-md-6">
+            <div class="stat-card bg-primary-gradient">
+                <div class="stat-icon">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="stat-content">
+                    <h3 class="stat-number">{{ company_users }}</h3>
+                    <p class="stat-label">المستخدمين النشطين</p>
+                </div>
+                <div class="stat-trend up">
+                    <i class="fas fa-arrow-up"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="stat-card bg-success-gradient">
+                <div class="stat-icon">
+                    <i class="fas fa-clipboard-check"></i>
+                </div>
+                <div class="stat-content">
+                    <h3 class="stat-number">{{ company_evaluations }}</h3>
+                    <p class="stat-label">التقييمات الإجمالية</p>
+                </div>
+                <div class="stat-trend up">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="stat-card bg-info-gradient">
+                <div class="stat-icon">
+                    <i class="fas fa-calendar-day"></i>
+                </div>
+                <div class="stat-content">
+                    <h3 class="stat-number">{{ today_evaluations }}</h3>
+                    <p class="stat-label">تقييمات اليوم</p>
+                </div>
+                <div class="stat-trend">
+                    <i class="fas fa-clock"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="stat-card bg-warning-gradient">
+                <div class="stat-icon">
+                    <i class="fas fa-star"></i>
+                </div>
+                <div class="stat-content">
+                    <h3 class="stat-number">{{ avg_score }}/10</h3>
+                    <p class="stat-label">متوسط التقييمات</p>
+                </div>
+                <div class="stat-trend">
+                    <i class="fas fa-chart-bar"></i>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- البطاقات المتاحة لمدير الشؤون -->
-    <div class="card-container d-flex flex-wrap justify-content-center gap-3 mt-4">
-        <!-- إدارة المستخدمين (محدودة) -->
-        <a href="{{ url_for('users') }}" class="feature-card bg-users">
-            <div class="icon-circle">
-                <i class="fas fa-users"></i>
-            </div>
-            <div>إدارة المستخدمين</div>
-        </a>
+    <div class="section-card">
+        <div class="section-header">
+            <h3 class="section-title">
+                <i class="fas fa-th-large me-2"></i>
+                الأدوات والإدارة
+            </h3>
+            <p class="section-subtitle">الوظائف والإمكانيات المتاحة لمدير الشؤون</p>
+        </div>
 
-        <!-- التقييمات -->
-        <a href="{{ url_for('evaluations') }}" class="feature-card bg-evaluations">
-            <div class="icon-circle">
-                <i class="fas fa-clipboard-check"></i>
+        <div class="card-container">
+            <!-- إدارة المستخدمين -->
+            <div class="feature-card-wrapper">
+                <a href="{{ url_for('users') }}" class="feature-card bg-users">
+                    <div class="card-icon">
+                        <i class="fas fa-users-cog"></i>
+                    </div>
+                    <div class="card-content">
+                        <h4 class="card-title">إدارة المستخدمين</h4>
+                        <p class="card-description">إدارة مستخدمي الشركة وتعديل الصلاحيات</p>
+                        <div class="card-badge">
+                            <span class="badge">{{ company_users }} مستخدم</span>
+                        </div>
+                    </div>
+                    <div class="card-arrow">
+                        <i class="fas fa-arrow-left"></i>
+                    </div>
+                </a>
             </div>
-            <div>التقييمات</div>
-        </a>
 
-        <!-- الجهات المسؤولة -->
-        <a href="{{ url_for('authorities') }}" class="feature-card bg-authorities">
-            <div class="icon-circle">
-                <i class="fas fa-users"></i>
+            <!-- التقييمات -->
+            <div class="feature-card-wrapper">
+                <a href="{{ url_for('evaluations') }}" class="feature-card bg-evaluations">
+                    <div class="card-icon">
+                        <i class="fas fa-clipboard-list"></i>
+                    </div>
+                    <div class="card-content">
+                        <h4 class="card-title">التقييمات</h4>
+                        <p class="card-description">عرض وإدارة جميع تقييمات الشركة</p>
+                        <div class="card-badge">
+                            <span class="badge">{{ company_evaluations }} تقييم</span>
+                        </div>
+                    </div>
+                    <div class="card-arrow">
+                        <i class="fas fa-arrow-left"></i>
+                    </div>
+                </a>
             </div>
-            <div>الجهات المسؤولة</div>
-        </a>
 
-        <!-- المناطق -->
-        <a href="{{ url_for('locations') }}" class="feature-card bg-locations">
-            <div class="icon-circle">
-                <i class="fas fa-map-marker-alt"></i>
+            <!-- الجهات المسؤولة -->
+            <div class="feature-card-wrapper">
+                <a href="{{ url_for('authorities') }}" class="feature-card bg-authorities">
+                    <div class="card-icon">
+                        <i class="fas fa-user-tie"></i>
+                    </div>
+                    <div class="card-content">
+                        <h4 class="card-title">الجهات المسؤولة</h4>
+                        <p class="card-description">إدارة جهات التقييم والمسؤوليات</p>
+                        <div class="card-badge">
+                            <span class="badge">جهات متعددة</span>
+                        </div>
+                    </div>
+                    <div class="card-arrow">
+                        <i class="fas fa-arrow-left"></i>
+                    </div>
+                </a>
             </div>
-            <div>المناطق</div>
-        </a>
 
-        <!-- التقارير -->
-        <a href="{{ url_for('report_summary') }}" class="feature-card bg-report-evaluation">
-            <div class="icon-circle">
-                <i class="fas fa-broom"></i>
+            <!-- المناطق -->
+            <div class="feature-card-wrapper">
+                <a href="{{ url_for('locations') }}" class="feature-card bg-locations">
+                    <div class="card-icon">
+                        <i class="fas fa-map-marked-alt"></i>
+                    </div>
+                    <div class="card-content">
+                        <h4 class="card-title">المناطق والمواقع</h4>
+                        <p class="card-description">إدارة المناطق والمواقع التابعة للشركة</p>
+                        <div class="card-badge">
+                            <span class="badge">{{ evaluated_regions }} منطقة</span>
+                        </div>
+                    </div>
+                    <div class="card-arrow">
+                        <i class="fas fa-arrow-left"></i>
+                    </div>
+                </a>
             </div>
-            <div>تقرير المناطق</div>
-        </a>
 
-        <a href="{{ url_for('reports') }}" class="feature-card bg-report-general">
-            <div class="icon-circle">
-                <i class="fas fa-file-alt"></i>
+            <!-- التقارير -->
+            <div class="feature-card-wrapper">
+                <a href="{{ url_for('report_summary') }}" class="feature-card bg-report-evaluation">
+                    <div class="card-icon">
+                        <i class="fas fa-broom"></i>
+                    </div>
+                    <div class="card-content">
+                        <h4 class="card-title">تقرير المناطق</h4>
+                        <p class="card-description">تقارير أداء المناطق والتقييمات</p>
+                        <div class="card-badge">
+                            <span class="badge">تحليل مفصل</span>
+                        </div>
+                    </div>
+                    <div class="card-arrow">
+                        <i class="fas fa-arrow-left"></i>
+                    </div>
+                </a>
             </div>
-            <div>تقرير المستخدمين</div>
-        </a>
 
-        <a href="{{ url_for('responsibility_report') }}" class="feature-card bg-report-responsibility">
-            <div class="icon-circle">
-                <i class="fas fa-balance-scale"></i>
+            <div class="feature-card-wrapper">
+                <a href="{{ url_for('reports') }}" class="feature-card bg-report-general">
+                    <div class="card-icon">
+                        <i class="fas fa-chart-pie"></i>
+                    </div>
+                    <div class="card-content">
+                        <h4 class="card-title">تقرير المستخدمين</h4>
+                        <p class="card-description">تقارير أداء المستخدمين والإنتاجية</p>
+                        <div class="card-badge">
+                            <span class="badge">إحصاءات</span>
+                        </div>
+                    </div>
+                    <div class="card-arrow">
+                        <i class="fas fa-arrow-left"></i>
+                    </div>
+                </a>
             </div>
-            <div>تقرير الجهات</div>
-        </a>
 
-        <!-- خطط العمل -->
-        <a href="{{ url_for('action_plans') }}" class="feature-card bg-action-plans">
-            <div class="icon-circle">
-                <i class="fas fa-tasks"></i>
+            <div class="feature-card-wrapper">
+                <a href="{{ url_for('responsibility_report') }}" class="feature-card bg-report-responsibility">
+                    <div class="card-icon">
+                        <i class="fas fa-balance-scale-left"></i>
+                    </div>
+                    <div class="card-content">
+                        <h4 class="card-title">تقرير الجهات</h4>
+                        <p class="card-description">تقارير مسؤولية الجهات والأداء</p>
+                        <div class="card-badge">
+                            <span class="badge">تقييم الجهات</span>
+                        </div>
+                    </div>
+                    <div class="card-arrow">
+                        <i class="fas fa-arrow-left"></i>
+                    </div>
+                </a>
             </div>
-            <div>خطط العمل</div>
-        </a>
+
+            <!-- خطط العمل -->
+            <div class="feature-card-wrapper">
+                <a href="{{ url_for('action_plans') }}" class="feature-card bg-action-plans">
+                    <div class="card-icon">
+                        <i class="fas fa-tasks"></i>
+                    </div>
+                    <div class="card-content">
+                        <h4 class="card-title">خطط العمل</h4>
+                        <p class="card-description">إدارة خطط التحسين والمتابعة</p>
+                        <div class="card-badge">
+                            <span class="badge">متابعة</span>
+                        </div>
+                    </div>
+                    <div class="card-arrow">
+                        <i class="fas fa-arrow-left"></i>
+                    </div>
+                </a>
+            </div>
+        </div>
     </div>
+
+    <!-- التقييمات الحديثة -->
+    {% if recent_evaluations %}
+    <div class="section-card mt-4">
+        <div class="section-header">
+            <h3 class="section-title">
+                <i class="fas fa-history me-2"></i>
+                أحدث التقييمات
+            </h3>
+            <a href="{{ url_for('evaluations') }}" class="view-all-link">
+                عرض الكل <i class="fas fa-arrow-left ms-1"></i>
+            </a>
+        </div>
+
+        <div class="recent-evaluations">
+            {% for evaluation in recent_evaluations %}
+            <div class="evaluation-item">
+                <div class="evaluation-avatar">
+                    <i class="fas fa-clipboard-check"></i>
+                </div>
+                <div class="evaluation-content">
+                    <h6 class="evaluation-title">
+                        تقييم {{ evaluation.region.name if evaluation.region else "غير محدد" }}
+                    </h6>
+                    <p class="evaluation-meta">
+                        <i class="fas fa-user me-1"></i>
+                        {{ evaluation.user.fullname if evaluation.user else "مستخدم" }}
+                        •
+                        <i class="fas fa-clock me-1"></i>
+                        {{ evaluation.date.strftime('%Y-%m-%d %H:%M') }}
+                    </p>
+                </div>
+                <div class="evaluation-status">
+                    <span class="status-badge {{ evaluation.status }}">
+                        {{ evaluation.status }}
+                    </span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 <style>
-.bg-action-plans { background: linear-gradient(45deg, #20c997, #198754); }
+/* تحسينات التصميم */
+.dashboard-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 20px;
+    padding: 2rem;
+    color: white;
+    margin-bottom: 2rem;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.user-badge {
+    background: rgba(255,255,255,0.2);
+    border-radius: 15px;
+    padding: 1rem;
+    backdrop-filter: blur(10px);
+}
+
+.badge-content {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.user-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+}
+
+.user-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.user-name {
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+.user-role {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+/* بطاقات الإحصائيات */
+.stat-card {
+    border-radius: 20px;
+    padding: 1.5rem;
+    color: white;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    transition: transform 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+}
+
+.bg-primary-gradient { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+.bg-success-gradient { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
+.bg-info-gradient { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+.bg-warning-gradient { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+
+.stat-icon {
+    font-size: 2.5rem;
+    opacity: 0.3;
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+}
+
+.stat-content {
+    text-align: right;
+}
+
+.stat-number {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    opacity: 0.9;
+    margin: 0;
+}
+
+.stat-trend {
+    position: absolute;
+    bottom: 1rem;
+    left: 1rem;
+    font-size: 1.2rem;
+}
+
+/* بطاقات الميزات */
+.section-card {
+    background: white;
+    border-radius: 20px;
+    padding: 2rem;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+    margin-bottom: 2rem;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.section-title {
+    color: #2c3e50;
+    font-weight: 700;
+    margin: 0;
+}
+
+.section-subtitle {
+    color: #7f8c8d;
+    margin: 0.5rem 0 0 0;
+}
+
+.view-all-link {
+    color: #3498db;
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.3s ease;
+}
+
+.view-all-link:hover {
+    color: #2980b9;
+}
+
+.card-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+}
+
+.feature-card {
+    display: flex;
+    align-items: center;
+    padding: 1.5rem;
+    border-radius: 15px;
+    color: white;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.feature-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    text-decoration: none;
+    color: white;
+}
+
+.feature-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: rgba(255,255,255,0.5);
+}
+
+.card-icon {
+    font-size: 2rem;
+    margin-left: 1rem;
+    opacity: 0.9;
+}
+
+.card-content {
+    flex: 1;
+}
+
+.card-title {
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    font-size: 1.1rem;
+}
+
+.card-description {
+    font-size: 0.85rem;
+    opacity: 0.9;
+    margin-bottom: 0.5rem;
+    line-height: 1.4;
+}
+
+.card-badge {
+    margin-top: 0.5rem;
+}
+
+.badge {
+    background: rgba(255,255,255,0.2);
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.card-arrow {
+    opacity: 0.7;
+    transition: transform 0.3s ease;
+}
+
+.feature-card:hover .card-arrow {
+    transform: translateX(-5px);
+}
+
+/* ألوان البطاقات */
+.bg-users { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+.bg-evaluations { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
+.bg-authorities { background: linear-gradient(135deg, #fc466b 0%, #3f5efb 100%); }
+.bg-locations { background: linear-gradient(135deg, #fd746c 0%, #ff9068 100%); }
+.bg-report-evaluation { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+.bg-report-general { background: linear-gradient(135deg, #a8ff78 0%, #78ffd6 100%); }
+.bg-report-responsibility { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+.bg-action-plans { background: linear-gradient(135deg, #20c997 0%, #198754 100%); }
+
+/* التقييمات الحديثة */
+.recent-evaluations {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.evaluation-item {
+    display: flex;
+    align-items: center;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 10px;
+    transition: background 0.3s ease;
+}
+
+.evaluation-item:hover {
+    background: #e9ecef;
+}
+
+.evaluation-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #3498db;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 1rem;
+}
+
+.evaluation-content {
+    flex: 1;
+}
+
+.evaluation-title {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+    color: #2c3e50;
+}
+
+.evaluation-meta {
+    font-size: 0.85rem;
+    color: #7f8c8d;
+    margin: 0;
+}
+
+.evaluation-status {
+    margin-right: auto;
+}
+
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.status-badge.draft { background: #fff3cd; color: #856404; }
+.status-badge.submitted { background: #d1ecf1; color: #0c5460; }
+.status-badge.approved { background: #d4edda; color: #155724; }
+.status-badge.rejected { background: #f8d7da; color: #721c24; }
+
+/* التجاوب */
+@media (max-width: 768px) {
+    .header-content {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .card-container {
+        grid-template-columns: 1fr;
+    }
+
+    .stat-card {
+        margin-bottom: 1rem;
+    }
+
+    .section-header {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+    }
+}
 </style>
 {% endblock %}

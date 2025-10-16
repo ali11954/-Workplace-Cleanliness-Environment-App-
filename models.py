@@ -101,29 +101,23 @@ class User(db.Model, UserMixin):
 
     @property
     def is_administrator(self):
-        """خاصية بديلة مؤكدة لـ is_admin"""
-        print(f"🔍 فحص is_administrator للمستخدم {self.username}:")
-        print(f"   - is_admin (DB): {self.is_admin}")
-        print(f"   - username: {self.username}")
-        print(f"   - role: {self.role}")
+        """خاصية متوافقة مع Flask-Login - الإصدار النهائي"""
+        # استخدام الحقل المباشر أولاً
+        if hasattr(self, '_is_admin') and self._is_admin is not None:
+            return bool(self._is_admin)
 
-        # إذا كان is_admin True في قاعدة البيانات
-        if self.is_admin:
-            print("   ✅ is_admin هو True في قاعدة البيانات")
-            return True
+        # ثم الشروط الأخرى
+        return self.role == 'admin' or self.username == 'admin'
 
-        # إذا كان اسم المستخدم 'admin'
-        if self.username == 'admin':
-            print("   ✅ اسم المستخدم هو 'admin'")
-            return True
+    # جعل is_admin كمسمى بديل لنفس الخاصية
+    @property
+    def is_admin(self):
+        return self.is_administrator
 
-        # إذا كان الدور 'admin'
-        if self.role == 'admin':
-            print("   ✅ الدور هو 'admin'")
-            return True
-
-        print("   ❌ المستخدم ليس مسؤولاً")
-        return False
+    @is_admin.setter
+    def is_admin(self, value):
+        """تعيين قيمة is_admin"""
+        self._is_admin = bool(value)
 
     # ========== دوال الصلاحيات الجديدة والمحدثة ==========
 
