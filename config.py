@@ -8,7 +8,10 @@ class Config:
     # ===============================
     # قاعدة البيانات - الإصدار المعدل
     # ===============================
-    DATABASE_URL = os.environ.get('DATABASE_URL')
+    # الرابط السحابي المباشر - تم إضافته
+    CLOUD_DB_URL = 'postgresql://evaluation_db_3th0_user:RylVGtHAlaIWTv63DcOjIMPPn1lJ54kT@dpg-d3ft80u3jp1c73f87ib0-a.frankfurt-postgres.render.com/evaluation_db_3th0'
+
+    DATABASE_URL = os.environ.get('DATABASE_URL') or CLOUD_DB_URL  # استخدم السحابي كافتراضي
 
     if DATABASE_URL:
         # تنظيف الرابط من المسافات
@@ -20,12 +23,20 @@ class Config:
 
         # إضافة sslmode=require لـ Render
         if 'render.com' in DATABASE_URL and 'sslmode=' not in DATABASE_URL:
-            DATABASE_URL += '?sslmode=require'
+            if '?' in DATABASE_URL:
+                DATABASE_URL += '&sslmode=require'
+            else:
+                DATABASE_URL += '?sslmode=require'
 
         SQLALCHEMY_DATABASE_URI = DATABASE_URL
 
-        print("✅ تم تهيئة رابط قاعدة البيانات Production")
-        print(f"📊 الرابط: {DATABASE_URL[:60]}...")  # طباعة جزء لأسباب أمنية
+        # تحديد نوع قاعدة البيانات
+        if 'postgresql' in DATABASE_URL:
+            print("✅ تم تهيئة رابط قاعدة البيانات السحابية (Production)")
+            print(f"🌐 السحابية: {DATABASE_URL.split('@')[1].split('/')[0]}")  # عرض اسم المضيف فقط
+        else:
+            print("✅ تم تهيئة رابط قاعدة البيانات Production")
+
     else:
         # قاعدة البيانات المحلية (لل development)
         BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -53,11 +64,14 @@ class Config:
     if 'postgresql' in SQLALCHEMY_DATABASE_URI:
         SQLALCHEMY_ENGINE_OPTIONS['connect_args'] = {
             'connect_timeout': 10,
-            'sslmode': 'require'
+            'sslmode': 'require',
+            'sslrootcert': None
         }
+        print("🔒 تم تفعيل خيارات SSL لPostgreSQL")
     else:
         # إذا كان SQLite
         SQLALCHEMY_ENGINE_OPTIONS['connect_args'] = {'check_same_thread': False}
+        print("💾 تم تفعيل خيارات SQLite")
 
     # ===============================
     # إعدادات Flask
@@ -71,3 +85,12 @@ class Config:
     PREFERRED_URL_SCHEME = 'https' if not DEBUG else 'http'
     WTF_CSRF_ENABLED = True
     WTF_CSRF_TIME_LIMIT = 3600
+
+    # إعدادات إضافية للسحابية
+    if 'postgresql' in SQLALCHEMY_DATABASE_URI:
+        # تحسينات لأداء PostgreSQL
+        SQLALCHEMY_ENGINE_OPTIONS.update({
+            'pool_size': 10,
+            'max_overflow': 20,
+            'pool_timeout': 30,
+        })
