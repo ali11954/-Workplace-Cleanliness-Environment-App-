@@ -16,13 +16,14 @@ from reportlab.pdfbase.ttfonts import TTFont
 from sqlalchemy import func, distinct
 
 # ====== 2️⃣ تحميل الإعدادات من config.py ======
-from config import Config
 
 # ====== 3️⃣ استيراد قاعدة البيانات والنماذج ======
 from models import db, User, Company, Location, Site, Place, Criterion, Evaluation, EvaluationDetail, EvaluationAuthority, UserPermission, Permission
 
 # ====== 4️⃣ إنشاء التطبيق وتهيئته ======
 app = Flask(__name__)
+from config import Config
+
 app.config.from_object(Config)
 
 # تهيئة قاعدة البيانات
